@@ -391,8 +391,9 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
         const mappedValue = dataToFill[templateField.id];
         
         if (mappedValue) {
-          setFormFields(prev => prev.map((f, i) => {
-            if (i === index) {
+          const fieldId = templateField.id;
+          setFormFields(prev => prev.map((f) => {
+            if (f.id === fieldId) {
               return { 
                 ...f, 
                 value: mappedValue, 
