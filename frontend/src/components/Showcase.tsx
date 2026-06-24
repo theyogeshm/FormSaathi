@@ -180,7 +180,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     if (!voice) {
       const prefix = langCode.split('-')[0];
       voice = voices.find(v => v.lang.startsWith(prefix)) ?? null;
-      if (voice) console.warn(`[FormSaathi TTS] No exact voice for ${langCode}. Using fallback: ${voice.name} (${voice.lang})`);
+      if (voice) console.warn(`[FormSaathi TTS] No exact voice for ${langCode}. Fallback: ${voice.name} (${voice.lang})`);
     }
 
     // 3. Fall back to any English voice
@@ -188,7 +188,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
       voice = voices.find(v => v.lang.startsWith('en-IN')) ??
               voices.find(v => v.lang.startsWith('en-US')) ??
               voices.find(v => v.lang.startsWith('en')) ?? null;
-      if (voice) console.warn(`[FormSaathi TTS] No ${langCode} voice found. Using English fallback: ${voice.name} (${voice.lang})`);
+      if (voice) console.warn(`[FormSaathi TTS] No ${langCode} voice. English fallback: ${voice.name} (${voice.lang})`);
     }
 
     // 4. Last resort: first available voice
@@ -197,19 +197,28 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
       console.warn(`[FormSaathi TTS] Using first available voice: ${voice.name}`);
     }
 
-    if (voice) console.info(`[FormSaathi TTS] ✓ Voice selected: "${voice.name}" lang=${voice.lang} local=${voice.localService}`);
+    if (voice) console.info(`[FormSaathi TTS] ✓ "${voice.name}" lang=${voice.lang} local=${voice.localService}`);
     return voice;
   };
+
+  // Pre-load voices at mount so getBestVoice always has a populated list.
+  // Chrome fires onvoiceschanged asynchronously; without this, the first call returns [].
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return;
+    // Trigger initial load
+    window.speechSynthesis.getVoices();
+    const handleVoicesChanged = () => { window.speechSynthesis.getVoices(); };
+    window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+  }, []);
 
   // Speak text using Web Speech API with improved quality settings
   const speakText = (text: string, speechId: string, lang?: string) => {
     if (!('speechSynthesis' in window)) return;
 
-    // Always cancel any ongoing speech first
-    window.speechSynthesis.cancel();
-
-    // Same button clicked while playing → toggle off (stop)
+    // Toggle off if the same button is clicked while already playing
     if (activeSpeechId === speechId && isSpeaking) {
+      window.speechSynthesis.cancel();
       setActiveSpeechId(null);
       setIsSpeaking(false);
       setSpeechStatus('stopped');
@@ -217,59 +226,52 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
       return;
     }
 
+    // Cancel any ongoing speech first
+    window.speechSynthesis.cancel();
+
     const targetLang = lang || getLangCode(formLang);
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = targetLang;
-    utterance.rate   = 0.95;  // clear, slightly slower than default
-    utterance.pitch  = 1.0;   // natural pitch
-    utterance.volume = 1.0;   // maximum volume
 
-    // Assign best available voice — must call getVoices() after cancel()
-    const voice = getBestVoice(targetLang);
-    if (voice) {
-      utterance.voice = voice;
-      setActiveVoiceLabel(`${voice.name} (${voice.lang})`);
-    } else {
-      setActiveVoiceLabel('default');
-    }
+    // ⚠️ Chrome bug: calling speak() immediately after cancel() silently fails.
+    // A short delay lets the synthesis engine fully reset before the next speak().
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang   = targetLang;
+      utterance.rate   = 0.95;
+      utterance.pitch  = 1.0;
+      utterance.volume = 1.0;
 
-    utterance.onstart = () => {
-      setActiveSpeechId(speechId);
-      setIsSpeaking(true);
-      setSpeechStatus('playing');
-    };
-    utterance.onpause = () => {
-      setSpeechStatus('paused');
-    };
-    utterance.onresume = () => {
-      setSpeechStatus('playing');
-    };
-    utterance.onend = () => {
-      setActiveSpeechId(null);
-      setIsSpeaking(false);
-      setSpeechStatus('idle');
-      setActiveVoiceLabel('');
-    };
-    utterance.onerror = (e) => {
-      console.error('[FormSaathi TTS] Error:', e.error);
-      setActiveSpeechId(null);
-      setIsSpeaking(false);
-      setSpeechStatus('idle');
-      setActiveVoiceLabel('');
-    };
+      // Assign best available voice
+      const voice = getBestVoice(targetLang);
+      if (voice) {
+        utterance.voice = voice;
+        setActiveVoiceLabel(`${voice.name} (${voice.lang})`);
+      } else {
+        setActiveVoiceLabel('default');
+      }
 
-    // Chrome bug workaround: voices may not be loaded yet on first call.
-    // Re-check voices after a brief delay if the list was empty.
-    if (window.speechSynthesis.getVoices().length === 0) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        const v2 = getBestVoice(targetLang);
-        if (v2) { utterance.voice = v2; setActiveVoiceLabel(`${v2.name} (${v2.lang})`); }
-        window.speechSynthesis.onvoiceschanged = null;
-        window.speechSynthesis.speak(utterance);
+      utterance.onstart = () => {
+        setActiveSpeechId(speechId);
+        setIsSpeaking(true);
+        setSpeechStatus('playing');
       };
-    } else {
+      utterance.onpause  = () => { setSpeechStatus('paused'); };
+      utterance.onresume = () => { setSpeechStatus('playing'); };
+      utterance.onend    = () => {
+        setActiveSpeechId(null);
+        setIsSpeaking(false);
+        setSpeechStatus('idle');
+        setActiveVoiceLabel('');
+      };
+      utterance.onerror = (e) => {
+        console.error('[FormSaathi TTS] Error:', e.error);
+        setActiveSpeechId(null);
+        setIsSpeaking(false);
+        setSpeechStatus('idle');
+        setActiveVoiceLabel('');
+      };
+
       window.speechSynthesis.speak(utterance);
-    }
+    }, 100); // 100ms is enough for Chrome to reset after cancel()
   };
 
   // Stop all speech
