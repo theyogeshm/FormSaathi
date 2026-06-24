@@ -565,27 +565,6 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
     setActiveUserRecord(currentUser);
 
     // Helper to generate a fake PAN number
-    const generatePAN = () => {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      const nums = '0123456789';
-      let pan = '';
-      for (let i = 0; i < 5; i++) pan += chars[Math.floor(Math.random() * chars.length)];
-      for (let i = 0; i < 4; i++) pan += nums[Math.floor(Math.random() * nums.length)];
-      pan += chars[Math.floor(Math.random() * chars.length)];
-      return pan;
-    };
-
-    // Helper to generate a fake Aadhaar number
-    const generateAadhaar = () => {
-      const nums = '0123456789';
-      let aadhaar = '';
-      for (let i = 0; i < 12; i++) {
-        if (i > 0 && i % 4 === 0) aadhaar += ' ';
-        aadhaar += nums[Math.floor(Math.random() * nums.length)];
-      }
-      return aadhaar;
-    };
-
     const dataToFill: Record<string, string> = {
       fullName: currentUser.full_name || '',
       fatherName: currentUser.father_spouse_name || '',
@@ -596,14 +575,22 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
       pincode: currentUser.pincode || '',
       accountType: currentUser.account_type === 'Savings' ? 'Savings Bank Account' : currentUser.account_type === 'Current' ? 'Current Account' : currentUser.account_type || '',
       nomineeName: currentUser.nominee_name || 'Kavya Kumar', // default if empty
-      panNo: generatePAN(),
-      aadhaarNo: generateAadhaar(),
+      panNo: '',
+      aadhaarNo: '',
       monthlyIncome: String(Math.floor(Math.random() * 50 + 40) * 1000), // 40k to 90k
       employerName: ['Tata Consultancy Services', 'Infosys Limited', 'Wipro Technologies', 'HDFC Bank Ltd', 'Reliance Industries'][Math.floor(Math.random() * 5)],
       loanAmount: String(Math.floor(Math.random() * 8 + 3) * 100000), // 3L to 10L
     };
 
     setFormFields(prev => prev.map(f => {
+      if (f.id === 'panNo' || f.id === 'aadhaarNo') {
+        return {
+          ...f,
+          value: '',
+          confidence: 0,
+          mappedFrom: undefined
+        };
+      }
       const mappedValue = dataToFill[f.id];
       if (mappedValue !== undefined) {
         return {
