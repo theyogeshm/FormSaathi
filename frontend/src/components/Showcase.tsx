@@ -1416,22 +1416,64 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     triggerScanningSequence(doc.fields, 'document');
   };
 
+  // Compress + resize an image file on a canvas to avoid OOM on mobile cameras.
+  // Returns a data-URL (JPEG ≤ maxSizePx on longest side, quality 0.80).
+  const compressImage = (file: File, maxSizePx = 1024, quality = 0.80): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const blobUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(blobUrl); // free the original blob immediately
+        const { width, height } = img;
+        const scale = Math.min(1, maxSizePx / Math.max(width, height));
+        const w = Math.round(width * scale);
+        const h = Math.round(height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas not supported')); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        reject(new Error('Image load failed'));
+      };
+      img.src = blobUrl;
+    });
+  };
+
   // Handle file drop/upload simulation
   const handleFileUploadSim = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      const previewUrl = URL.createObjectURL(file);
-      setUploadedImageSrc(previewUrl);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input value so the same file can be re-selected if needed
+    e.target.value = '';
 
-      const randomDoc: DemoDocument = {
-        id: 'uploaded_doc',
-        name: file.name,
-        type: 'form',
-        image: '📄',
-        fields: {}
-      };
-      setPendingUploadedDoc(randomDoc);
-    }
+    compressImage(file, 1024, 0.80)
+      .then((dataUrl) => {
+        setUploadedImageSrc(dataUrl);
+        const randomDoc: DemoDocument = {
+          id: 'uploaded_doc',
+          name: file.name,
+          type: 'form',
+          image: '📄',
+          fields: {}
+        };
+        setPendingUploadedDoc(randomDoc);
+      })
+      .catch((err) => {
+        console.error('[FormSaathi] Image compression failed:', err);
+        // Fallback: try a direct object URL (works on most desktop browsers)
+        try {
+          const url = URL.createObjectURL(file);
+          setUploadedImageSrc(url);
+          setPendingUploadedDoc({ id: 'uploaded_doc', name: file.name, type: 'form', image: '📄', fields: {} });
+        } catch {
+          alert('Could not load the image. Please try a smaller file.');
+        }
+      });
   };
 
   // Helper to map CSV user record to SBI Nomination Form (DA-1) fields
