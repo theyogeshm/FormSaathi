@@ -1956,7 +1956,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                         </div>
 
                         {/* Guided Assistant Panel */}
-                        <div className="hidden lg:block bg-primary/5 border border-primary/20 rounded-2xl p-5 space-y-4 relative overflow-hidden">
+                        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 space-y-4 relative overflow-hidden">
                           <div className="flex justify-between items-center border-b border-primary/10 pb-2">
                             <span className="text-[10px] font-extrabold text-primary uppercase tracking-widest flex items-center gap-1.5">
                               <Sparkles className="w-3.5 h-3.5 text-secondary animate-pulse" /> {t('sh_ai_guide', formLang)}
@@ -2379,30 +2379,36 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
             <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-outline-variant/30 shadow-md flex flex-col min-h-[400px] sm:min-h-[460px]">
               
               {/* Form Header with Language Toggle */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant/20 pb-4 gap-4">
-                <div className="min-w-0 flex-1">
-                  <span className="text-[10px] font-extrabold text-secondary uppercase tracking-widest block">
-                    {t('sh_form_title', formLang)}
-                  </span>
-                  <h3 className="text-md font-bold text-on-surface truncate max-w-xs sm:max-w-md" title={selectedTemplate.title}>
-                    {selectedTemplate.title}
-                  </h3>
-                </div>
+              <div className="border-b border-outline-variant/20 pb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-extrabold text-secondary uppercase tracking-widest block">
+                      {t('sh_form_title', formLang)}
+                    </span>
+                    <h3 className="text-md font-bold text-on-surface truncate max-w-xs sm:max-w-md" title={selectedTemplate.title}>
+                      {selectedTemplate.title}
+                    </h3>
+                  </div>
 
-                {/* Multilingual Pills — synced to global language */}
-                <div className="flex flex-shrink-0 items-center gap-1.5 bg-surface-container-low p-1 rounded-lg border border-outline-variant/30">
-                  <span className="text-[10px] font-bold text-on-surface-variant px-1.5">{t('sh_lang_label', formLang)}</span>
-                  {LANGUAGES.map((l) => (
-                    <button
-                      key={l.code}
-                      type="button"
-                      onClick={() => setFormLang(l.code)}
-                      className={`px-2 py-1 rounded text-xs font-bold transition-all cursor-pointer ${formLang === l.code ? 'bg-primary text-white' : 'text-on-surface-variant hover:text-primary hover:bg-white'}`}
-                      title={l.name}
-                    >
-                      {l.nativeName}
-                    </button>
-                  ))}
+                  {/* Multilingual Pills — synced to global language */}
+                  <div className="w-full sm:w-auto">
+                    <div className="flex flex-wrap items-center gap-1 bg-surface-container-low p-1 rounded-lg border border-outline-variant/30">
+                      <span className="text-[10px] font-bold text-on-surface-variant px-1.5 w-full sm:w-auto">{t('sh_lang_label', formLang)}</span>
+                      <div className="flex flex-wrap gap-1">
+                        {LANGUAGES.map((l) => (
+                          <button
+                            key={l.code}
+                            type="button"
+                            onClick={() => setFormLang(l.code)}
+                            className={`px-2 py-1 rounded text-xs font-bold transition-all cursor-pointer ${formLang === l.code ? 'bg-primary text-white' : 'text-on-surface-variant hover:text-primary hover:bg-white'}`}
+                            title={l.name}
+                          >
+                            {l.nativeName}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
