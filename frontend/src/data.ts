@@ -1,14 +1,13 @@
 import { Language, Bank, DemoDocument, FormTemplate, FeatureItem, StepItem, ImpactStat } from './types';
 
 export const LANGUAGES: Language[] = [
+  { code: 'en', name: 'English', nativeName: 'English' },
+  { code: 'hinglish', name: 'Hinglish', nativeName: 'Hinglish' },
   { code: 'hi', name: 'Hindi', nativeName: 'हिंदी' },
   { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்' },
   { code: 'bn', name: 'Bengali', nativeName: 'বাংলা' },
   { code: 'mr', name: 'Marathi', nativeName: 'मराठी' },
   { code: 'te', name: 'Telugu', nativeName: 'తెలుగు' },
-  { code: 'gu', name: 'Gujarati', nativeName: 'ગુજરાતી' },
-  { code: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ' },
-  { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം' },
 ];
 
 export const BANKS: Bank[] = [

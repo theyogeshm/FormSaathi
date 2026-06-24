@@ -1,12 +1,14 @@
 import React from 'react';
 import { Camera, Mic, Search, ArrowRight, ShieldCheck } from 'lucide-react';
+import { t } from '../translations';
 
 interface HeroProps {
+  currentLang: string;
   onTryDemo: () => void;
   onSelectAction: (action: 'photo' | 'voice' | 'search') => void;
 }
 
-export default function Hero({ onTryDemo, onSelectAction }: HeroProps) {
+export default function Hero({ currentLang, onTryDemo, onSelectAction }: HeroProps) {
   return (
     <section 
       id="solution" 
@@ -22,11 +24,11 @@ export default function Hero({ onTryDemo, onSelectAction }: HeroProps) {
         {/* Left: Headline & Content */}
         <div className="space-y-8 animate-fade-in">
           <h1 className="font-headline-xl text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight">
-            Scan any blank form. We recreate it. You fill it — we guide every box.
+            {t('hero_title', currentLang)}
           </h1>
           
           <p className="font-body-lg text-lg sm:text-xl text-white/85 max-w-xl leading-relaxed">
-            FormSaathi reads your blank physical form and rebuilds an exact digital replica. Speak or type your answers as we guide you field-by-field in your own language. **Your Aadhaar and PAN never leave your hands.**
+            {t('hero_subtitle', currentLang)}
           </p>
 
           {/* Feature Quick-Actions */}
@@ -36,14 +38,14 @@ export default function Hero({ onTryDemo, onSelectAction }: HeroProps) {
               className="glass-card px-5 py-3 rounded-full flex items-center gap-2.5 hover:bg-white/15 transition-all text-sm font-medium transform active:scale-95 cursor-pointer"
             >
               <Camera className="w-4 h-4 text-secondary-container" />
-              Scan Blank Form
+              {t('hero_scan_btn', currentLang)}
             </button>
             <button 
               onClick={() => onSelectAction('search')}
               className="glass-card px-5 py-3 rounded-full flex items-center gap-2.5 hover:bg-white/15 transition-all text-sm font-medium transform active:scale-95 cursor-pointer"
             >
               <Search className="w-4 h-4 text-secondary-container" />
-              Search for a Form
+              {t('hero_search_btn', currentLang)}
             </button>
           </div>
 
@@ -53,7 +55,7 @@ export default function Hero({ onTryDemo, onSelectAction }: HeroProps) {
               onClick={onTryDemo}
               className="bg-white text-primary hover:bg-surface-container hover:scale-102 px-8 py-4 rounded-full font-extrabold text-lg transition-all shadow-lg hover:shadow-xl text-center cursor-pointer"
             >
-              Try the Demo
+              {t('hero_try_demo', currentLang)}
             </button>
 
           </div>
@@ -87,7 +89,7 @@ export default function Hero({ onTryDemo, onSelectAction }: HeroProps) {
             <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
               <ShieldCheck className="w-6 h-6 text-green-600" />
             </div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-on-surface">Secure Bank</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-on-surface">{t('hero_secure_bank', currentLang)}</span>
           </div>
 
           {/* Floating AI Brain Icon (Bottom Center) */}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Mic, Search, CheckCircle2, Upload, FileText, Download, QrCode, Sparkles, RefreshCw, AlertCircle, Printer } from 'lucide-react';
 import { ShowcaseTab, DemoDocument, FormTemplate, FormField } from '../types';
 import { DEMO_DOCUMENTS, FORM_TEMPLATES, LANGUAGES } from '../data';
+import { t } from '../translations';
 import csvContent from '../../data/formsaathi_fake_users.csv?raw';
 
 const parseCSV = (csvText: string) => {
@@ -55,9 +56,11 @@ const csvRecords = parseCSV(csvContent);
 interface ShowcaseProps {
   initialActiveTab?: ShowcaseTab;
   key?: any;
+  currentLang?: string;
+  onChangeLang?: (lang: string) => void;
 }
 
-export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) {
+export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en', onChangeLang }: ShowcaseProps) {
   const [activeTab, setActiveTab] = useState<ShowcaseTab>(initialActiveTab);
   const [selectedDoc, setSelectedDoc] = useState<DemoDocument | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<FormTemplate>(FORM_TEMPLATES[0]);
@@ -75,8 +78,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
   // Search Template states
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Multilingual state for Form Labels
-  const [selectedLang, setSelectedLang] = useState<string>('en');
+  // Language is driven by the global currentLang prop from App
 
   // PDF & QR Modal state
   const [showResultModal, setShowResultModal] = useState<boolean>(false);
@@ -374,7 +376,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
   const triggerScanningSequence = (unusedData: Record<string, string>, source: 'document' | 'voice') => {
     setIsScanning(true);
     setScanProgress(0);
-    setScanningStatus('Scanning form...');
+    setScanningStatus(t('sh_status_scanning', currentLang));
     setAutofillStatusMessage('');
 
     // Select or reuse the active user record from the CSV
@@ -388,10 +390,10 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
     const dataToFill = getDa1DataToFill(currentUser);
 
     const statuses = [
-      { progress: 20, msg: 'Scanning form...' },
-      { progress: 50, msg: 'Detecting fields...' },
-      { progress: 80, msg: 'Preparing digital replica...' },
-      { progress: 100, msg: 'Form mapped successfully!' },
+      { progress: 20, msg: t('sh_status_scanning', currentLang) },
+      { progress: 50, msg: t('sh_status_detecting', currentLang) },
+      { progress: 80, msg: t('sh_status_preparing', currentLang) },
+      { progress: 100, msg: t('sh_status_mapped', currentLang) },
     ];
 
     let currentStep = 0;
@@ -457,7 +459,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
 
         // Check for nominee reminder flow or success message
         if (activeTab === 'photo') {
-          setAutofillStatusMessage('Auto-filled successfully ✓');
+          setAutofillStatusMessage('sh_autofill_success');
         }
       }
     }, 350);
@@ -529,75 +531,9 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
     )
   );
 
-  // Translate field label based on language selection
-  const getTranslatedLabel = (fieldId: string, englishLabel: string) => {
-    if (selectedLang === 'en') return englishLabel;
-
-    const translations: Record<string, Record<string, string>> = {
-      hi: {
-        fullName: 'आवेदक का पूरा नाम',
-        fatherName: 'पिता / जीवनसाथी का नाम',
-        dob: 'जन्म तिथि',
-        gender: 'लिंग',
-        panNo: 'पैन कार्ड नंबर (PAN)',
-        aadhaarNo: 'आधार कार्ड नंबर',
-        phone: 'मोबाइल नंबर',
-        address: 'आवासीय पता',
-        pincode: 'पिनकोड',
-        accountType: 'खाता प्रकार',
-        monthlyIncome: 'मासिक आय (INR)',
-        employerName: 'नियोक्ता का नाम',
-        loanAmount: 'ऋण राशि',
-        nomineeName: 'नामांकित व्यक्ति का नाम',
-      },
-      ta: {
-        fullName: 'விண்ணப்பதாரரின் முழு பெயர்',
-        fatherName: 'தந்தை / துணைவியார் பெயர்',
-        dob: 'பிறந்த தேதி',
-        gender: 'பாலினம்',
-        panNo: 'பான் கார்டு எண் (PAN)',
-        aadhaarNo: 'ஆதார் கார்டு எண்',
-        phone: 'கைபேசி எண்',
-        address: 'வீட்டு முகவரி',
-        pincode: 'அஞ்சல் குறியீடு',
-        accountType: 'கணக்கு வகை',
-        monthlyIncome: 'மாத வருமானம்',
-        employerName: 'நிறுவனத்தின் பெயர்',
-        loanAmount: 'கடன் தொகை',
-      },
-      bn: {
-        fullName: 'আবেদনকারীর পুরো নাম',
-        fatherName: 'পিতা / জীবনসঙ্গীর নাম',
-        dob: 'জন্ম তারিখ',
-        gender: 'লিঙ্গ',
-        panNo: 'প্যান কার্ড নম্বর (PAN)',
-        aadhaarNo: 'আধার কার্ড নম্বর',
-        phone: 'মোবাইল নম্বর',
-        address: 'আবাসিক ঠিকানা',
-        pincode: 'পিনকোড',
-        accountType: 'অ্যাকাউন্টের ধরন',
-        monthlyIncome: 'মাসিক আয়',
-        employerName: 'नিয়োগকর্তার নাম',
-        loanAmount: 'ঋণ পরিমাণ',
-      },
-      mr: {
-        fullName: 'अर्जदाराचे पूर्ण नाव',
-        fatherName: 'वडिलांचे / पतीचे नाव',
-        dob: 'जन्म तारीख',
-        gender: 'लिंग',
-        panNo: 'पॅन कार्ड नंबर (PAN)',
-        aadhaarNo: 'आधार कार्ड नंबर',
-        phone: 'मोबाईल नंबर',
-        address: 'रहवासी पत्ता',
-        pincode: 'पिनकोड',
-        accountType: 'खात्याचा प्रकार',
-        monthlyIncome: 'मासिक उत्पन्न',
-        employerName: 'कंपनीचे नाव',
-        loanAmount: 'कर्जाची रक्कम',
-      }
-    };
-
-    return translations[selectedLang]?.[fieldId] || englishLabel;
+  // Get translated field label using the centralized translation system
+  const getTranslatedLabel = (fieldId: string) => {
+    return t('field_' + fieldId, currentLang);
   };
 
   // Submit filled form
@@ -647,7 +583,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
       return { ...f, value: '', confidence: 0, mappedFrom: undefined };
     }));
 
-    setAutofillStatusMessage('Auto-filled successfully ✓');
+    setAutofillStatusMessage('sh_autofill_success');
   };
 
   // Check if any field is filled
@@ -660,44 +596,47 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
         {/* Section Headers */}
         <div className="text-center space-y-4 mb-10">
           <span className="font-label-caps text-xs text-secondary font-bold tracking-widest uppercase bg-rose-50 border border-rose-200 px-4 py-1.5 rounded-full inline-block">
-            Experience FormSaathi AI
+            {t('sh_badge', currentLang)}
           </span>
           <h2 className="font-headline-lg text-3xl sm:text-4xl lg:text-5xl font-extrabold text-on-surface tracking-tight">
-            Scan your form. We recreate it. You fill it.
+            {t('sh_title', currentLang)}
           </h2>
           <p className="text-body-md text-on-surface-variant max-w-xl mx-auto">
-            Choose your preferred mock interface below. Either photograph a blank form to recreate it, view a voice-guided conversation, or search our popular banking form library.
+            {t('sh_desc', currentLang)}
           </p>
           <div className="bg-primary/5 border border-primary/20 py-2.5 px-4 rounded-xl max-w-xl mx-auto text-xs font-semibold text-primary leading-relaxed shadow-sm">
-            🛡️ Hackathon Demo: Currently demonstrates the workflow using a predefined SBI DA-1 Nomination Form. Production version will support dynamic form recognition and reconstruction.
+            {t('sh_demo_note', currentLang)}
           </div>
         </div>
 
         {/* Tab Controls */}
         <div className="flex justify-center gap-2 sm:gap-3 mb-10 max-w-xl mx-auto bg-surface-container-low p-1.5 rounded-full border border-outline-variant/30">
           <button 
+            type="button"
             onClick={() => setActiveTab('photo')}
             className={`flex-1 py-2 px-3 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'photo' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
             id="tab-photo-btn"
           >
             <Camera className="w-4 h-4" />
-            Scan Blank Form
+            {t('sh_tab_photo', currentLang)}
           </button>
           <button 
+            type="button"
             onClick={() => setActiveTab('voice')}
             className={`flex-1 py-2 px-3 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'voice' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
             id="tab-voice-btn"
           >
             <Mic className="w-4 h-4" />
-            Voice Guide
+            {t('sh_tab_voice', currentLang)}
           </button>
           <button 
+            type="button"
             onClick={() => setActiveTab('search')}
             className={`flex-1 py-2 px-3 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'search' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
             id="tab-search-btn"
           >
             <Search className="w-4 h-4" />
-            Search Library
+            {t('sh_tab_search', currentLang)}
           </button>
         </div>
 
@@ -711,14 +650,14 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
               {/* Tab Content Header */}
               <div className="border-b border-outline-variant/20 pb-4 mb-4">
                 <h3 className="text-xl font-bold text-on-surface flex items-center gap-2">
-                  {activeTab === 'photo' && <><Camera className="w-5 h-5 text-primary" /> Visual Form Scanner</>}
-                  {activeTab === 'voice' && <><Mic className="w-5 h-5 text-primary" /> Voice Guided Assistant</>}
-                  {activeTab === 'search' && <><Search className="w-5 h-5 text-primary" /> Blank Forms Library</>}
+                  {activeTab === 'photo' && <><Camera className="w-5 h-5 text-primary" /> {t('sh_visual_scanner', currentLang)}</>}
+                  {activeTab === 'voice' && <><Mic className="w-5 h-5 text-primary" /> {t('sh_voice_assistant', currentLang)}</>}
+                  {activeTab === 'search' && <><Search className="w-5 h-5 text-primary" /> {t('sh_search_library', currentLang)}</>}
                 </h3>
                 <p className="text-xs text-on-surface-variant mt-1">
-                  {activeTab === 'photo' && 'Photograph a blank banking form to watch FormSaathi recreate its layout digitally.'}
-                  {activeTab === 'voice' && 'Listen to a guided voice dialogue mapping regional spoken details to form fields.'}
-                  {activeTab === 'search' && 'Load and recreate official blank forms directly from our standard registry.'}
+                  {activeTab === 'photo' && t('sh_visual_desc', currentLang)}
+                  {activeTab === 'voice' && t('sh_voice_desc', currentLang)}
+                  {activeTab === 'search' && t('sh_search_desc', currentLang)}
                 </p>
               </div>
 
@@ -738,9 +677,9 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
                         <Upload className="w-10 h-10 text-on-surface-variant/70 mb-4 group-hover:scale-110 transition-transform duration-300" />
-                        <h4 className="font-bold text-sm text-on-surface mb-1">Upload a blank physical form</h4>
+                        <h4 className="font-bold text-sm text-on-surface mb-1">{t('sh_upload_title', currentLang)}</h4>
                         <p className="text-xs text-on-surface-variant max-w-[200px]">
-                          Drag and drop or select file to scan and map a blank form.
+                          {t('sh_upload_desc', currentLang)}
                         </p>
                       </div>
                     )}
@@ -758,11 +697,12 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                         {/* Success Message */}
                         <p className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-200 mb-4 animate-fade-in flex items-center gap-1.5">
                           <CheckCircle2 className="w-4 h-4" />
-                          Form uploaded successfully. Review and click Proceed to continue.
+                          {t('sh_upload_success', currentLang)}
                         </p>
                         {/* Buttons */}
                         <div className="flex gap-3 w-full">
                           <button
+                            type="button"
                             onClick={() => {
                               if (pendingUploadedDoc) {
                                 setSelectedDoc(pendingUploadedDoc);
@@ -771,16 +711,17 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                             }}
                             className="flex-1 bg-primary text-white hover:bg-primary-container py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow transition-all hover:scale-102 transform active:scale-95"
                           >
-                            Proceed
+                            {t('sh_proceed', currentLang)}
                           </button>
                           <button
+                            type="button"
                             onClick={() => {
                               setUploadedImageSrc(null);
                               setPendingUploadedDoc(null);
                             }}
                             className="bg-white text-on-surface border border-outline-variant/30 hover:bg-surface-container py-2.5 px-4 rounded-xl font-bold text-xs cursor-pointer transition-colors"
                           >
-                            Cancel
+                            {t('sh_cancel', currentLang)}
                           </button>
                         </div>
                       </div>
@@ -790,12 +731,13 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                     {!isScanning && !selectedDoc && (
                       <div className="space-y-3">
                         <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider block">
-                          Try a Sample Blank Form:
+                          {t('sh_try_sample', currentLang)}
                         </span>
                         <div className="grid grid-cols-2 gap-3">
                           {DEMO_DOCUMENTS.map((doc) => (
                             <button
                               key={doc.id}
+                              type="button"
                               onClick={() => handleSelectPresetDoc(doc)}
                               className={`p-4 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer hover:border-primary hover:bg-primary/5 ${selectedDoc?.id === doc.id ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-outline-variant/40 bg-surface'}`}
                             >
@@ -803,7 +745,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                               <div className="min-w-0">
                                 <h5 className="font-bold text-xs truncate text-on-surface">{doc.name}</h5>
                                 <span className="text-[10px] text-primary uppercase font-bold">
-                                  Blank Form Replica
+                                  {t('sh_blank_replica', currentLang)}
                                 </span>
                               </div>
                             </button>
@@ -825,7 +767,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                           
                           <div className="space-y-1">
                             <span className="text-xs font-bold text-primary uppercase tracking-wider">
-                              Mapping Progress: {scanProgress}%
+                              {t('sh_mapping_progress', currentLang)} {scanProgress}%
                             </span>
                             <p className="text-sm font-semibold text-on-surface">
                               {scanningStatus}
@@ -850,9 +792,11 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                           <div className="flex gap-3 items-start">
                             <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                             <div>
-                              <h4 className="font-bold text-xs text-green-800">Form Structure Recreated</h4>
+                              <h4 className="font-bold text-xs text-green-800">{t('sh_mapped_recreated', currentLang)}</h4>
                               <p className="text-[10px] text-green-700/90 mt-1">
-                                FormSaathi recreated <strong>{selectedDoc.name}</strong> digitally. No identity documents were uploaded—your privacy is preserved.
+                                {t('sh_privacy_notice', currentLang).split('{name}')[0]}
+                                <strong>{selectedDoc.name}</strong>
+                                {t('sh_privacy_notice', currentLang).split('{name}')[1] || ''}
                               </p>
                             </div>
                           </div>
@@ -867,10 +811,10 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                         <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 space-y-4 relative overflow-hidden">
                           <div className="flex justify-between items-center border-b border-primary/10 pb-2">
                             <span className="text-[10px] font-extrabold text-primary uppercase tracking-widest flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5 text-secondary animate-pulse" /> FormSaathi AI Guide
+                              <Sparkles className="w-3.5 h-3.5 text-secondary animate-pulse" /> {t('sh_ai_guide', currentLang)}
                             </span>
                             <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-                              Guided Mode
+                              {t('sh_guided_mode', currentLang)}
                             </span>
                           </div>
 
@@ -881,32 +825,34 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                               return (
                                 <div className="space-y-3">
                                   <div>
-                                    <span className="text-[10px] text-on-surface-variant font-bold uppercase">Current Box:</span>
-                                    <h5 className="font-extrabold text-sm text-on-surface flex items-center justify-between">
-                                      <span>{currentField.label}</span>
+                                    <span className="text-[10px] text-on-surface-variant font-bold uppercase">{t('sh_current_box', currentLang)}</span>
+                                    <h5 className="font-extrabold text-sm text-on-surface flex items-center justify-between mt-0.5">
+                                      <span>{t('field_' + currentField.id, currentLang)}</span>
                                       <span className="text-[9px] text-primary/80 font-bold bg-white px-2 py-0.5 rounded border">
-                                        Field {guidedFieldIndex + 1} of {formFields.length}
+                                        {t('sh_field_of', currentLang)
+                                          .replace('{current}', String(guidedFieldIndex + 1))
+                                          .replace('{total}', String(formFields.length))}
                                       </span>
                                     </h5>
                                   </div>
 
                                   <div className="space-y-2 pt-2 border-t border-outline-variant/10 text-xs">
                                     <div className="space-y-1">
-                                      <span className="text-[9px] font-bold text-secondary uppercase block">💡 Guidance Tip (English):</span>
+                                      <span className="text-[9px] font-bold text-secondary uppercase block">{t('sh_guide_tip_label', currentLang)}</span>
                                       <p className="text-on-surface leading-relaxed font-medium bg-white p-2.5 rounded-lg border border-outline-variant/20">
                                         {info.tip}
                                       </p>
                                     </div>
                                     
                                     <div className="space-y-1 pt-1">
-                                      <span className="text-[9px] font-bold text-primary uppercase block">🗣️ Regional Translation (Hindi):</span>
+                                      <span className="text-[9px] font-bold text-primary uppercase block">{t('sh_guide_reg_label', currentLang)}</span>
                                       <p className="text-on-surface-variant leading-relaxed font-semibold italic bg-white p-2.5 rounded-lg border border-outline-variant/20">
                                         {info.regional}
                                       </p>
                                     </div>
 
                                     <div className="space-y-1 pt-1 animate-fade-in">
-                                      <span className="text-[9px] font-bold text-on-surface-variant uppercase block">❓ Why is this required:</span>
+                                      <span className="text-[9px] font-bold text-on-surface-variant uppercase block">{t('sh_guide_why_label', currentLang)}</span>
                                       <p className="text-on-surface-variant text-[11px] leading-relaxed">
                                         {info.reason}
                                       </p>
@@ -917,11 +863,11 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                                     <span className="text-[10px] text-on-surface-variant font-bold">
                                       {currentField.value ? (
                                         <span className="text-green-600 flex items-center gap-1 font-extrabold">
-                                          <CheckCircle2 className="w-3.5 h-3.5" /> Format Verified ✓
+                                          <CheckCircle2 className="w-3.5 h-3.5" /> {t('sh_format_verified', currentLang)}
                                         </span>
                                       ) : (
                                         <span className="text-amber-600 flex items-center gap-1 font-extrabold animate-pulse">
-                                          ⚡ Awaiting Input
+                                          ⚡ {t('sh_awaiting_input', currentLang)}
                                         </span>
                                       )}
                                     </span>
@@ -933,8 +879,8 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                             <div className="text-center py-4 space-y-2">
                               <p className="text-xs text-on-surface-variant font-medium">
                                 {guidedFieldIndex >= formFields.length 
-                                  ? "All fields completed and validated! Ready to export." 
-                                  : "Focus on any input field on the right to view custom guidance here."}
+                                  ? t('sh_autofill_success', currentLang) 
+                                  : t('sh_status_scan_begin', currentLang)}
                               </p>
                             </div>
                           )}
@@ -948,7 +894,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                                   className="flex-grow bg-primary text-white hover:bg-primary-container py-2 px-2 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 cursor-pointer shadow hover:scale-102 transform active:scale-95 transition-all whitespace-nowrap"
                                 >
                                   <Sparkles className="w-3 h-3" />
-                                  Simulate Guided Fill
+                                  {t('sh_simulate_fill', currentLang)}
                                 </button>
                                 <button
                                   type="button"
@@ -956,24 +902,26 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                                   className="bg-secondary text-white hover:bg-secondary-container py-2 px-2 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 cursor-pointer shadow hover:scale-102 transform active:scale-95 transition-all whitespace-nowrap"
                                 >
                                   <Sparkles className="w-3 h-3 animate-pulse" />
-                                  Instant Fill
+                                  {t('sh_instant_fill', currentLang)}
                                 </button>
                               </>
                             )}
                             {isWalkthroughPlaying && (
                               <button
+                                type="button"
                                 onClick={() => setIsWalkthroughPlaying(false)}
                                 className="flex-grow bg-amber-500 text-white hover:bg-amber-600 py-2 px-2 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 cursor-pointer shadow transition-all whitespace-nowrap"
                               >
                                 <RefreshCw className="w-3 h-3 animate-spin" />
-                                Pause Walkthrough
+                                {t('sh_pause', currentLang)}
                               </button>
                             )}
                             <button
+                              type="button"
                               onClick={resetDemoState}
                               className="bg-white text-on-surface border border-outline-variant/30 hover:bg-surface-container py-2 px-2.5 rounded-xl font-bold text-[10px] sm:text-xs cursor-pointer transition-colors whitespace-nowrap"
                             >
-                              Reset
+                              {t('sh_reset', currentLang)}
                             </button>
                           </div>
                         </div>
@@ -999,22 +947,23 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                             ))}
                           </div>
                           <span className="text-[10px] font-extrabold text-secondary animate-pulse uppercase tracking-widest">
-                            Voice guided session active...
+                            {t('sh_voice_session', currentLang)}
                           </span>
                         </div>
                       ) : (
                         <button
-                          onClick={handleStartVoiceSim}
+                          type="button"
+                          onClick={() => handleStartVoiceSim()}
                           className="px-6 py-3 rounded-full bg-primary hover:bg-primary-container text-white flex items-center gap-2 shadow-lg hover:shadow-xl hover:scale-102 transition-all cursor-pointer font-bold text-xs"
                         >
                           <Mic className="w-4 h-4" />
-                          Simulate Nominee Voice Guide
+                          {t('sh_simulate_voice', currentLang)}
                         </button>
                       )}
 
                       {!isVoiceRecording && voiceStep === 0 && (
                         <p className="text-[11px] text-on-surface-variant text-center mt-4 max-w-xs leading-relaxed">
-                          Click to play a demo of a regional voice conversation guiding the user to fill out their nominee details.
+                          {t('sh_voice_timeline_sub', currentLang)}
                         </p>
                       )}
                     </div>
@@ -1024,28 +973,30 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                       <div className="space-y-3 bg-surface-container-low border border-outline-variant/30 rounded-2xl p-4 animate-fade-in">
                         <div className="flex justify-between items-center border-b border-outline-variant/20 pb-2">
                           <span className="text-[10px] font-extrabold text-primary uppercase tracking-widest flex items-center gap-1">
-                            <Sparkles className="w-3 h-3 text-secondary animate-pulse" /> Bhashini Speech Engine
+                            <Sparkles className="w-3 h-3 text-secondary animate-pulse" /> {t('sh_bhashini', currentLang)}
                           </span>
                           <span className="text-[10px] font-bold text-on-surface-variant bg-white px-2 py-0.5 rounded border">
-                            Nominee Field Guide
+                            {t('sh_voice_timeline_title', currentLang)}
                           </span>
                         </div>
 
                         {/* Dialogue step 1: AI */}
                         <div className="space-y-1.5 text-xs">
-                          <span className="text-[9px] font-extrabold text-primary uppercase tracking-wider block">FormSaathi (AI):</span>
+                          <span className="text-[9px] font-extrabold text-primary uppercase tracking-wider block">{t('sh_ai_name', currentLang)}</span>
                           <p className="text-on-surface font-semibold leading-relaxed bg-white p-2.5 rounded-lg border border-outline-variant/20">
-                            "Let's fill the Nominee Details section. Who would you like to nominate for this account?"
+                            {t('sh_ai_q_nominee', currentLang)}
                           </p>
                           <p className="text-on-surface-variant italic leading-relaxed text-[11px] pl-2 border-l border-primary/20">
-                            (Hindi: "अब नॉमिनी का विवरण भरें। आप किसे नामांकित करना चाहेंगे?")
+                            {t('sh_ai_q_nominee_reg', currentLang)}
                           </p>
                         </div>
 
                         {/* Dialogue step 2: User */}
                         {voiceStep >= 2 && (
                           <div className="space-y-1.5 text-xs pt-3 border-t border-outline-variant/10 animate-fade-in">
-                            <span className="text-[9px] font-extrabold text-secondary uppercase tracking-wider block">Customer ({activeUserRecord?.full_name.split(' ')[0] || 'Customer'}):</span>
+                            <span className="text-[9px] font-extrabold text-secondary uppercase tracking-wider block">
+                              {t('sh_customer_name', currentLang).replace('{name}', activeUserRecord?.full_name.split(' ')[0] || 'Customer')}
+                            </span>
                             <p className="text-on-surface font-semibold italic bg-white p-2.5 rounded-lg border border-outline-variant/20">
                               {voiceTranscript}
                             </p>
@@ -1058,14 +1009,14 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                         {/* Dialogue step 3: AI processes */}
                         {voiceStep >= 3 && (
                           <div className="space-y-1 text-center bg-purple-50 border border-purple-100 rounded-xl p-2.5 text-[11px] font-bold text-primary animate-pulse">
-                            🔄 Vision AI mapping nominee relationships & formatting data...
+                            {t('sh_timeline_processing', currentLang)}
                           </div>
                         )}
 
                         {/* Dialogue step 4: AI success */}
                         {voiceStep === 4 && (
                           <div className="space-y-1.5 text-xs pt-3 border-t border-outline-variant/10 animate-fade-in">
-                            <span className="text-[9px] font-extrabold text-green-700 uppercase tracking-wider block">FormSaathi (AI):</span>
+                            <span className="text-[9px] font-extrabold text-green-700 uppercase tracking-wider block">{t('sh_ai_name', currentLang)}</span>
                             {activeUserRecord?.nominee_name ? (
                               (() => {
                                 const isSimulated = activeUserRecord.nominee_name === 'Pratik Kumar';
@@ -1074,21 +1025,24 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                                 return (
                                   <>
                                     <p className="text-green-800 font-semibold leading-relaxed bg-green-50 p-2.5 rounded-lg border border-green-200">
-                                      "Perfect! Recreated fields: Nominee Name = <strong>{activeUserRecord.nominee_name}</strong>, Relationship = <strong>{rel}</strong>, Age = <strong>{age}</strong>. Format checks verified successfully ✓."
+                                      {t('sh_timeline_success', currentLang)
+                                        .replace('{name}', activeUserRecord.nominee_name)
+                                        .replace('{rel}', rel)
+                                        .replace('{age}', age)}
                                     </p>
                                     
                                     {/* Nominee Field Values box */}
                                     <div className="bg-white border border-outline-variant/30 rounded-xl p-3 text-[11px] space-y-2 mt-2">
                                       <div className="flex justify-between border-b pb-1">
-                                        <span className="text-on-surface-variant">Nominee Name:</span>
+                                        <span className="text-on-surface-variant">{t('field_nomineeName', currentLang)}:</span>
                                         <span className="font-bold text-on-surface">{activeUserRecord.nominee_name}</span>
                                       </div>
                                       <div className="flex justify-between border-b pb-1">
-                                        <span className="text-on-surface-variant">Relationship:</span>
+                                        <span className="text-on-surface-variant">{t('field_nomineeRelationship', currentLang)}:</span>
                                         <span className="font-bold text-on-surface">{rel}</span>
                                       </div>
                                       <div className="flex justify-between">
-                                        <span className="text-on-surface-variant">Nominee Age:</span>
+                                        <span className="text-on-surface-variant">{t('field_nomineeAge', currentLang)}:</span>
                                         <span className="font-bold text-on-surface">{age}</span>
                                       </div>
                                     </div>
@@ -1098,21 +1052,24 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                             ) : (
                               <>
                                 <p className="text-green-800 font-semibold leading-relaxed bg-green-50 p-2.5 rounded-lg border border-green-200">
-                                  "Perfect! Recreated fields: Nominee Name = <strong>Pratik Kumar</strong>, Relationship = <strong>Son</strong>, Age = <strong>12</strong> (Minor). Format checks verified successfully ✓."
+                                  {t('sh_timeline_success', currentLang)
+                                    .replace('{name}', 'Pratik Kumar')
+                                    .replace('{rel}', 'Son')
+                                    .replace('{age}', '12')}
                                 </p>
                                 
                                 {/* Nominee Field Values box */}
                                 <div className="bg-white border border-outline-variant/30 rounded-xl p-3 text-[11px] space-y-2 mt-2">
                                   <div className="flex justify-between border-b pb-1">
-                                    <span className="text-on-surface-variant">Nominee Name:</span>
+                                    <span className="text-on-surface-variant">{t('field_nomineeName', currentLang)}:</span>
                                     <span className="font-bold text-on-surface">Pratik Kumar</span>
                                   </div>
                                   <div className="flex justify-between border-b pb-1">
-                                    <span className="text-on-surface-variant">Relationship:</span>
+                                    <span className="text-on-surface-variant">{t('field_nomineeRelationship', currentLang)}:</span>
                                     <span className="font-bold text-on-surface">Son</span>
                                   </div>
                                   <div className="flex justify-between">
-                                    <span className="text-on-surface-variant">Nominee Age:</span>
+                                    <span className="text-on-surface-variant">{t('field_nomineeAge', currentLang)}:</span>
                                     <span className="font-bold text-on-surface">12 (Minor)</span>
                                   </div>
                                 </div>
@@ -1133,7 +1090,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                       <Search className="w-4 h-4 text-on-surface-variant absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input 
                         type="text"
-                        placeholder="Search standard Indian banks (SBI, HDFC...)"
+                        placeholder={t('sh_search_placeholder', currentLang)}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full bg-surface border border-outline-variant rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
@@ -1143,32 +1100,33 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                     {/* Template Catalog */}
                     <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                       {filteredTemplates.length > 0 ? (
-                        filteredTemplates.map((t) => (
+                        filteredTemplates.map((tmpl) => (
                           <button
-                            key={t.id}
-                            onClick={() => handleSelectTemplate(t)}
-                            className={`w-full p-3 rounded-xl border text-left transition-all flex justify-between items-center cursor-pointer hover:border-primary ${selectedTemplate.id === t.id ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface'}`}
+                            key={tmpl.id}
+                            type="button"
+                            onClick={() => handleSelectTemplate(tmpl)}
+                            className={`w-full p-3 rounded-xl border text-left transition-all flex justify-between items-center cursor-pointer hover:border-primary ${selectedTemplate.id === tmpl.id ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface'}`}
                           >
                             <div>
-                              <h5 className="font-bold text-xs text-on-surface">{t.title}</h5>
+                              <h5 className="font-bold text-xs text-on-surface">{tmpl.title}</h5>
                               <span className="text-[10px] text-on-surface-variant">
-                                {t.bankName} • {t.fields.length} Fields
+                                {tmpl.bankName} • {tmpl.fields.length} Fields
                               </span>
                             </div>
                             <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded">
-                              SELECT
+                              {t('sh_select', currentLang)}
                             </span>
                           </button>
                         ))
                       ) : (
                         <div className="p-8 text-center text-xs text-on-surface-variant">
-                          No banking templates found matching that query.
+                          {t('sh_search_no_results', currentLang)}
                         </div>
                       )}
                     </div>
 
                     <p className="text-[11px] text-on-surface-variant leading-relaxed text-center italic bg-surface-container-low p-2 rounded-xl">
-                      *Selecting a template clears any active simulation and swaps fields instantly!
+                      {t('sh_search_note', currentLang)}
                     </p>
                   </div>
                 )}
@@ -1179,11 +1137,11 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
               <div className="border-t border-outline-variant/20 pt-4 flex gap-1.5 justify-center flex-wrap sm:flex-nowrap" id="scan-checks">
                 <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-extrabold border transition-all whitespace-nowrap ${selectedDoc || voiceStep >= 4 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30'}`}>
                   <CheckCircle2 className="w-3 h-3" />
-                  Form Layout Mapped
+                  {t('sh_layout_mapped', currentLang)}
                 </div>
                 <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-extrabold border transition-all whitespace-nowrap ${selectedDoc || voiceStep >= 4 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30'}`}>
                   <CheckCircle2 className="w-3 h-3" />
-                  Field Formats Verified
+                  {t('sh_formats_verified', currentLang)}
                 </div>
               </div>
 
@@ -1199,21 +1157,22 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant/20 pb-4 gap-4">
                 <div className="min-w-0 flex-1">
                   <span className="text-[10px] font-extrabold text-secondary uppercase tracking-widest block">
-                    Interactive Bank Application Form
+                    {t('sh_form_title', currentLang)}
                   </span>
                   <h3 className="text-md font-bold text-on-surface truncate max-w-xs sm:max-w-md" title={selectedTemplate.title}>
                     {selectedTemplate.title}
                   </h3>
                 </div>
 
-                {/* Multilingual Pills */}
+                {/* Multilingual Pills — synced to global language */}
                 <div className="flex flex-shrink-0 items-center gap-1.5 bg-surface-container-low p-1 rounded-lg border border-outline-variant/30">
-                  <span className="text-[10px] font-bold text-on-surface-variant px-1.5">Lang:</span>
-                  {LANGUAGES.slice(0, 5).map((l) => (
+                  <span className="text-[10px] font-bold text-on-surface-variant px-1.5">{t('sh_lang_label', currentLang)}</span>
+                  {LANGUAGES.map((l) => (
                     <button
                       key={l.code}
-                      onClick={() => setSelectedLang(l.code)}
-                      className={`px-2 py-1 rounded text-xs font-bold transition-all cursor-pointer ${selectedLang === l.code ? 'bg-primary text-white' : 'text-on-surface-variant hover:text-primary hover:bg-white'}`}
+                      type="button"
+                      onClick={() => onChangeLang && onChangeLang(l.code)}
+                      className={`px-2 py-1 rounded text-xs font-bold transition-all cursor-pointer ${currentLang === l.code ? 'bg-primary text-white' : 'text-on-surface-variant hover:text-primary hover:bg-white'}`}
                       title={l.name}
                     >
                       {l.nativeName}
@@ -1226,7 +1185,8 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
               <form onSubmit={handleFormSubmit} className="flex-grow space-y-4 py-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {formFields.map((field) => {
-                    const label = getTranslatedLabel(field.id, field.label);
+                    const label = t('field_' + field.id, currentLang);
+                    const placeholder = t('holder_' + field.id, currentLang);
                     return (
                       <div key={field.id} className="space-y-1">
                         <label className="text-xs font-bold text-on-surface flex items-center justify-between">
@@ -1248,7 +1208,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                             }}
                             className={`w-full bg-surface border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary transition-all ${field.confidence > 0 ? 'border-green-300 ring-1 ring-green-100 bg-green-50/10' : 'border-outline-variant'}`}
                           >
-                            <option value="">Select...</option>
+                            <option value="">{t('sh_select', currentLang)}...</option>
                             {field.options?.map((opt, i) => (
                               <option key={i} value={opt}>{opt}</option>
                             ))}
@@ -1256,7 +1216,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                         ) : (
                           <input 
                             type={field.type}
-                            placeholder={field.placeholder}
+                            placeholder={placeholder}
                             value={field.value}
                             onFocus={() => handleFieldFocus(field.id)}
                             onChange={(e) => {
@@ -1281,10 +1241,10 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                     <span className="text-xs font-semibold text-on-surface-variant">
                       {autofillStatusMessage ? (
                         <span className="text-green-600 font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 animate-pulse" /> {autofillStatusMessage}
+                          <CheckCircle2 className="w-3.5 h-3.5 animate-pulse" /> {t(autofillStatusMessage, currentLang)}
                         </span>
                       ) : (
-                        isAnyFieldFilled ? 'AI processing active' : 'Scan a blank form or search library to begin'
+                        isAnyFieldFilled ? t('sh_status_ai', currentLang) : t('sh_status_scan_begin', currentLang)
                       )}
                     </span>
                   </div>
@@ -1296,7 +1256,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                       className="w-full sm:w-auto px-4 py-2.5 rounded-full font-bold text-xs whitespace-nowrap bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-secondary animate-pulse" />
-                      Auto-fill Form
+                      {t('sh_autofill_btn', currentLang)}
                     </button>
 
                     <button
@@ -1305,7 +1265,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                       className={`w-full sm:w-auto px-4 py-2.5 rounded-full font-bold text-xs whitespace-nowrap shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${isAnyFieldFilled ? 'bg-secondary text-white hover:bg-secondary-container hover:shadow-lg hover:scale-102' : 'bg-surface-container-highest text-on-surface-variant/40 cursor-not-allowed border'}`}
                     >
                       <Download className="w-3.5 h-3.5" />
-                      Download Form & QR Code
+                      {t('sh_download_btn', currentLang)}
                     </button>
                   </div>
                 </div>
@@ -1331,9 +1291,9 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
               <div className="py-12 flex flex-col items-center justify-center space-y-6 text-center">
                 <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
                 <div className="space-y-1">
-                  <h4 className="text-xl font-bold text-on-surface">Generating Banking Dossier...</h4>
+                  <h4 className="text-xl font-bold text-on-surface">{t('res_generating', currentLang)}</h4>
                   <p className="text-sm text-on-surface-variant max-w-xs">
-                    Formatting extracted values into official regulatory standard layout (PDF-1A).
+                    {t('res_formatting', currentLang)}
                   </p>
                 </div>
               </div>
@@ -1349,9 +1309,10 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                     <span className="text-[10px] font-extrabold text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
                       STATUS: SUCCESSFUL
                     </span>
-                    <h3 className="text-xl font-bold text-on-surface mt-2">Dossier Generated Successfully</h3>
+                    <h3 className="text-xl font-bold text-on-surface mt-2">{t('res_success_title', currentLang)}</h3>
                   </div>
                   <button 
+                    type="button"
                     onClick={() => setShowResultModal(false)}
                     className="text-on-surface-variant hover:text-on-surface text-lg font-bold bg-surface-container p-2 rounded-full cursor-pointer"
                   >
@@ -1361,7 +1322,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
 
                 {/* Subheading explanation */}
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  The application document has been parsed, mapped, and pre-formatted. You can now present the digital QR code at any physical bank branch teller or print the regulatory application dossier.
+                  {t('res_success_desc', currentLang)}
                 </p>
 
                 {/* PDF and QR Code Layout Details */}
@@ -1370,31 +1331,32 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                   {/* Mock Form PDF summary card */}
                   <div className="bg-surface-container-low border border-outline-variant/40 rounded-2xl p-4 space-y-3">
                     <span className="text-[10px] font-extrabold text-primary uppercase tracking-widest flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-primary" /> Application Dossier
+                      <FileText className="w-3.5 h-3.5 text-primary" /> {t('res_pdf_title', currentLang)}
                     </span>
                     
                     <div className="space-y-2 text-[11px]">
                       {formFields.slice(0, 5).map(f => (
                         <div key={f.id} className="flex justify-between border-b border-outline-variant/10 pb-1">
-                          <span className="text-on-surface-variant">{f.label}:</span>
+                          <span className="text-on-surface-variant">{t('field_' + f.id, currentLang)}:</span>
                           <span className="font-bold text-on-surface truncate max-w-[120px]">{f.value || 'N/A'}</span>
                         </div>
                       ))}
                     </div>
                     
                     <button 
+                      type="button"
                       onClick={() => alert('Mock PDF Download triggered! In production, this saves the filled form directly.')}
                       className="w-full bg-white text-primary border border-primary/20 hover:bg-primary/5 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      Save PDF Document
+                      {t('res_save_pdf', currentLang)}
                     </button>
                   </div>
 
                   {/* QR Code display card */}
                   <div className="bg-surface-container-low border border-outline-variant/40 rounded-2xl p-4 flex flex-col items-center justify-between space-y-4">
                     <span className="text-[10px] font-extrabold text-secondary uppercase tracking-widest flex items-center gap-1.5">
-                      <QrCode className="w-3.5 h-3.5 text-secondary" /> Teller Instant QR Code
+                      <QrCode className="w-3.5 h-3.5 text-secondary" /> {t('res_qr_title', currentLang)}
                     </span>
 
                     {/* Vector representation of QR */}
@@ -1430,11 +1392,12 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                     </div>
 
                     <button 
+                      type="button"
                       onClick={() => alert('Simulating Teller scanner: QR contains encrypted and compressed JSON package of this banking request.')}
                       className="w-full bg-primary text-white hover:bg-primary-container py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Printer className="w-3.5 h-3.5" />
-                      Print Branch QR Slip
+                      {t('res_print_slip', currentLang)}
                     </button>
                   </div>
 
@@ -1443,10 +1406,11 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                 {/* Footer close button */}
                 <div className="pt-4 border-t border-outline-variant/20 flex justify-end gap-2">
                   <button 
+                    type="button"
                     onClick={() => setShowResultModal(false)}
                     className="bg-surface-container-highest text-on-surface hover:bg-outline-variant/30 px-6 py-2.5 rounded-full font-bold text-xs cursor-pointer transition-all"
                   >
-                    Close Dossier Viewer
+                    {t('res_close', currentLang)}
                   </button>
                 </div>
 

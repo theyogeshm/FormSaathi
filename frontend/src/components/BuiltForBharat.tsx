@@ -1,7 +1,12 @@
 import React from 'react';
 import { LANGUAGES } from '../data';
+import { t } from '../translations';
 
-export default function BuiltForBharat() {
+interface BuiltForBharatProps {
+  currentLang: string;
+}
+
+export default function BuiltForBharat({ currentLang }: BuiltForBharatProps) {
   return (
     <section className="bg-surface-container py-14 border-b border-outline-variant/15 relative overflow-hidden">
       {/* Visual background gradient circle */}
@@ -10,7 +15,7 @@ export default function BuiltForBharat() {
       <div className="max-w-7xl mx-auto px-6 text-center relative z-10 space-y-8">
         
         <h2 className="font-headline-lg text-3xl sm:text-4xl lg:text-5xl font-extrabold text-on-surface tracking-tight">
-          Built for Bharat
+          {t('built_for_bharat', currentLang)}
         </h2>
 
         {/* Displaying Language Badges */}
@@ -24,13 +29,13 @@ export default function BuiltForBharat() {
             </span>
           ))}
           <span className="bg-white text-secondary border border-outline-variant/30 px-6 py-2.5 rounded-full font-extrabold shadow-sm hover:border-secondary hover:bg-secondary/5 transition-all duration-200 cursor-default">
-            +18 More Languages
+            {t('more_languages', currentLang)}
           </span>
         </div>
 
         {/* Powered by credentials */}
         <p className="font-body-lg text-lg text-on-surface-variant italic leading-relaxed pt-2">
-          Powered by <span className="font-bold text-primary">Bhashini</span> &amp; <span className="font-bold text-primary">AI4Bharat</span>
+          {t('powered_by', currentLang)}
         </p>
 
       </div>

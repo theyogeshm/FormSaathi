@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Bolt, RotateCcw } from 'lucide-react';
 import { STEPS } from '../data';
+import { t } from '../translations';
 
-export default function HowItWorks() {
+interface HowItWorksProps {
+  currentLang: string;
+}
+
+export default function HowItWorks({ currentLang }: HowItWorksProps) {
   const [successScore, setSuccessScore] = useState(0);
 
   // Animate the circular progress gauge on load
@@ -18,6 +23,29 @@ export default function HowItWorks() {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (successScore / 100) * circumference;
 
+  const translatedSteps = STEPS.map((step) => {
+    let titleKey = '';
+    let descKey = '';
+    if (step.num === 1) {
+      titleKey = 'how_step_1_title';
+      descKey = 'how_step_1_desc';
+    } else if (step.num === 2) {
+      titleKey = 'how_step_2_title';
+      descKey = 'how_step_2_desc';
+    } else if (step.num === 3) {
+      titleKey = 'how_step_3_title';
+      descKey = 'how_step_3_desc';
+    } else if (step.num === 4) {
+      titleKey = 'how_step_4_title';
+      descKey = 'how_step_4_desc';
+    }
+    return {
+      ...step,
+      title: t(titleKey, currentLang),
+      description: t(descKey, currentLang),
+    };
+  });
+
   return (
     <section id="how-it-works" className="bg-surface-container py-16">
       <div className="max-w-7xl mx-auto px-6">
@@ -26,11 +54,11 @@ export default function HowItWorks() {
           {/* Left Side: Steps Description */}
           <div className="space-y-12">
             <h2 className="font-headline-lg text-3xl sm:text-4xl lg:text-5xl font-extrabold text-on-surface tracking-tight">
-              The magic of FormSaathi AI
+              {t('how_headline', currentLang)}
             </h2>
 
             <div className="space-y-10">
-              {STEPS.map((step) => (
+              {translatedSteps.map((step) => (
                 <div 
                   key={step.num}
                   className="flex gap-6 items-start hover:translate-x-1 transition-transform duration-300"
@@ -108,16 +136,16 @@ export default function HowItWorks() {
                     {successScore}%
                   </span>
                   <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full uppercase tracking-wider mt-1.5 border border-green-200">
-                    Excellent
+                    {t('how_gauge_label', currentLang)}
                   </span>
                 </div>
               </div>
 
               {/* Bottom Labels */}
               <div className="mt-4 space-y-1">
-                <h4 className="text-lg font-bold text-on-surface">Fields Verified</h4>
+                <h4 className="text-lg font-bold text-on-surface">{t('how_gauge_title', currentLang)}</h4>
                 <p className="text-sm text-on-surface-variant max-w-[240px]">
-                  Real-time format and mistake validation ensures 100% correct inputs.
+                  {t('how_gauge_desc', currentLang)}
                 </p>
               </div>
 
@@ -127,7 +155,7 @@ export default function HowItWorks() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                 </span>
-                LIVE VALIDATED
+                {t('how_live_validated', currentLang)}
               </div>
 
             </div>

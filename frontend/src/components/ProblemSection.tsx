@@ -1,27 +1,32 @@
 import React from 'react';
 import { Clock, AlertOctagon, Globe } from 'lucide-react';
+import { t } from '../translations';
 
-export default function ProblemSection() {
+interface ProblemSectionProps {
+  currentLang: string;
+}
+
+export default function ProblemSection({ currentLang }: ProblemSectionProps) {
   const problems = [
     {
-      title: 'Time Sink',
-      badge: 'High Drop-off',
+      title: t('prob_time_sink', currentLang),
+      badge: t('prob_high_dropoff', currentLang),
       badgeBg: 'bg-rose-100 text-rose-800 border-rose-200',
-      description: 'Average customer spends 45 minutes filling complex loan applications or KYC documents.',
+      description: t('prob_time_sink_desc', currentLang),
       icon: <Clock className="w-6 h-6 text-primary" />,
     },
     {
-      title: 'Rejection',
-      badge: 'High Error Rate',
+      title: t('prob_rejection', currentLang),
+      badge: t('prob_high_error', currentLang),
       badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
-      description: 'Over 30% of manual forms are rejected due to simple transcription errors or missing fields.',
+      description: t('prob_rejection_desc', currentLang),
       icon: <AlertOctagon className="w-6 h-6 text-primary" />,
     },
     {
-      title: 'Exclusion',
-      badge: 'Accessibility Gap',
+      title: t('prob_exclusion', currentLang),
+      badge: t('prob_accessibility', currentLang),
       badgeBg: 'bg-purple-100 text-purple-800 border-purple-200',
-      description: 'Forms in English/Hindi exclude millions of regional language speakers from formal finance.',
+      description: t('prob_exclusion_desc', currentLang),
       icon: <Globe className="w-6 h-6 text-primary" />,
     },
   ];
@@ -31,10 +36,10 @@ export default function ProblemSection() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center space-y-4 mb-10">
           <span className="font-label-caps text-xs text-primary font-bold tracking-widest uppercase bg-surface-container px-4 py-1.5 rounded-full inline-block">
-            The Form Problem
+            {t('prob_badge', currentLang)}
           </span>
           <h2 className="font-headline-lg text-3xl sm:text-4xl lg:text-5xl font-extrabold text-on-surface tracking-tight">
-            Why banking feels like a chore
+            {t('prob_headline', currentLang)}
           </h2>
         </div>
 

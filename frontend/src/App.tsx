@@ -10,12 +10,19 @@ import FeaturesGrid from './components/FeaturesGrid';
 import BuiltForBharat from './components/BuiltForBharat';
 import Footer from './components/Footer';
 import { ShowcaseTab } from './types';
+import { t } from './translations';
 
 export default function App() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [modalSubmitted, setModalSubmitted] = useState<boolean>(false);
   const [showcaseKey, setShowcaseKey] = useState<number>(0);
   const [initialShowcaseTab, setInitialShowcaseTab] = useState<ShowcaseTab>('photo');
+  const [currentLang, setCurrentLang] = useState<string>(() => localStorage.getItem('formsaathi_lang') || 'en');
+
+  const handleLangChange = (lang: string) => {
+    setCurrentLang(lang);
+    localStorage.setItem('formsaathi_lang', lang);
+  };
 
   // Contact/Demo form state
   const [demoForm, setDemoForm] = useState({
@@ -53,28 +60,29 @@ export default function App() {
     <div className="bg-background text-on-surface font-sans min-h-screen relative antialiased selection:bg-primary-fixed-dim selection:text-primary">
       
       {/* Navbar */}
-      <NavBar onTryDemo={handleOpenDemoModal} />
+      <NavBar currentLang={currentLang} onChangeLang={handleLangChange} onTryDemo={handleOpenDemoModal} />
 
       {/* Hero Section */}
       <Hero 
+        currentLang={currentLang}
         onTryDemo={() => scrollToDemo('photo')} 
         onSelectAction={scrollToDemo}
       />
 
       {/* Problem Section: "Why banking feels like a chore" */}
-      <ProblemSection />
+      <ProblemSection currentLang={currentLang} />
 
       {/* How It Works: Steps description & Circular success gauge */}
-      <HowItWorks />
+      <HowItWorks currentLang={currentLang} />
 
       {/* Showcase: Interactive mock photo scanner / voice / search */}
-      <Showcase key={showcaseKey} initialActiveTab={initialShowcaseTab} />
+      <Showcase key={showcaseKey} initialActiveTab={initialShowcaseTab} currentLang={currentLang} onChangeLang={handleLangChange} />
 
       {/* Features Grid: Zero-Rejection checks */}
-      <FeaturesGrid />
+      <FeaturesGrid currentLang={currentLang} />
 
       {/* Built For Bharat: Regional Language Support display */}
-      <BuiltForBharat />
+      <BuiltForBharat currentLang={currentLang} />
 
 
       {/* Final Action CTA Banner */}
@@ -84,10 +92,10 @@ export default function App() {
 
         <div className="max-w-4xl mx-auto px-6 space-y-8 relative z-10">
           <h2 className="font-headline-xl text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight tracking-tight">
-            Turn your next form into a 30-second conversation.
+            {t('cta_title', currentLang)}
           </h2>
           <p className="text-body-lg text-lg text-white/80 max-w-xl mx-auto leading-relaxed">
-            Join forward-looking cooperative banks, regional institutions, and premier retail branches simplifying document processing today.
+            {t('cta_subtitle', currentLang)}
           </p>
           <div className="pt-2">
             <button 
@@ -95,14 +103,14 @@ export default function App() {
               className="bg-white text-primary hover:bg-surface-container font-extrabold text-xl px-12 py-5 rounded-full shadow-2xl hover:shadow-primary/20 transform hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer inline-flex items-center gap-3"
             >
               <Sparkles className="w-5 h-5 text-secondary animate-pulse" />
-              Request a Demo
+              {t('cta_btn', currentLang)}
             </button>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <Footer />
+      <Footer currentLang={currentLang} />
 
       {/* HIGH-FIDELITY CONVERSION DEMO MODAL */}
       {isModalOpen && (
@@ -127,13 +135,13 @@ export default function App() {
                 
                 <div className="space-y-0.5">
                   <span className="text-[10px] font-extrabold text-primary uppercase tracking-widest flex items-center gap-1">
-                    <Landmark className="w-3.5 h-3.5" /> Institutional Registry
+                    <Landmark className="w-3.5 h-3.5" /> {t('modal_registry', currentLang)}
                   </span>
                   <h3 className="text-xl font-extrabold text-on-surface">
-                    Request an AI Demo
+                    {t('modal_title', currentLang)}
                   </h3>
                   <p className="text-xs text-on-surface-variant">
-                    Let FormSaathi custom-tailor a secure on-premise form automation walkthrough for your banking system.
+                    {t('modal_sub', currentLang)}
                   </p>
                 </div>
 
@@ -141,7 +149,7 @@ export default function App() {
                   
                   {/* Name */}
                   <div className="space-y-0.5">
-                    <label className="text-xs font-bold text-on-surface">Your Full Name</label>
+                    <label className="text-xs font-bold text-on-surface">{t('modal_name', currentLang)}</label>
                     <input 
                       type="text" 
                       required
@@ -154,7 +162,7 @@ export default function App() {
 
                   {/* Email */}
                   <div className="space-y-0.5">
-                    <label className="text-xs font-bold text-on-surface">Work Email Address</label>
+                    <label className="text-xs font-bold text-on-surface">{t('modal_email', currentLang)}</label>
                     <div className="relative">
                       <Mail className="w-4 h-4 text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2" />
                       <input 
@@ -170,7 +178,7 @@ export default function App() {
 
                   {/* Bank name */}
                   <div className="space-y-0.5">
-                    <label className="text-xs font-bold text-on-surface">Institution / Bank Name</label>
+                    <label className="text-xs font-bold text-on-surface">{t('modal_bank', currentLang)}</label>
                     <div className="relative">
                       <Building className="w-4 h-4 text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2" />
                       <input 
@@ -186,7 +194,7 @@ export default function App() {
 
                   {/* Estimated branches */}
                   <div className="space-y-0.5">
-                    <label className="text-xs font-bold text-on-surface">Estimated Active Branches</label>
+                    <label className="text-xs font-bold text-on-surface">{t('modal_branches', currentLang)}</label>
                     <select 
                       value={demoForm.branches}
                       onChange={(e) => setDemoForm({ ...demoForm, branches: e.target.value })}
@@ -201,7 +209,7 @@ export default function App() {
 
                   {/* Message */}
                   <div className="space-y-0.5">
-                    <label className="text-xs font-bold text-on-surface">Additional Requirements / Notes</label>
+                    <label className="text-xs font-bold text-on-surface">{t('modal_notes', currentLang)}</label>
                     <textarea 
                       placeholder="e.g., Interest in cooperative KYC forms, regional language translation etc..."
                       rows={2}
@@ -216,7 +224,7 @@ export default function App() {
                     className="w-full bg-primary hover:bg-primary-container text-white py-2.5 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-102 transform active:scale-95 pt-3"
                   >
                     <Send className="w-4 h-4" />
-                    Submit Request Dossier
+                    {t('modal_submit', currentLang)}
                   </button>
 
                 </form>
@@ -230,15 +238,15 @@ export default function App() {
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="text-2xl font-extrabold text-on-surface">Request Approved!</h4>
+                  <h4 className="text-2xl font-extrabold text-on-surface">{t('modal_success_title', currentLang)}</h4>
                   <p className="text-sm text-on-surface-variant max-w-xs leading-relaxed mx-auto">
-                    Thank you, <strong>{demoForm.name}</strong>. We have generated a custom brochure and pilot guidelines for <strong>{demoForm.bankName}</strong>.
+                    {t('modal_success_desc', currentLang).replace('{name}', demoForm.name).replace('{bankName}', demoForm.bankName)}
                   </p>
                 </div>
 
                 <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100 max-w-sm text-center">
                   <p className="text-xs font-medium text-primary leading-relaxed">
-                    📧 An automated pilot authorization email and pricing schedule has been sent to <strong>{demoForm.email}</strong>. Our custom support agent will reach out within 15 minutes.
+                    📧 {t('modal_success_note', currentLang).replace('{email}', demoForm.email)}
                   </p>
                 </div>
 
@@ -246,7 +254,7 @@ export default function App() {
                   onClick={() => setIsModalOpen(false)}
                   className="w-full bg-on-surface hover:bg-on-surface-variant text-white py-3 rounded-xl font-bold text-sm shadow cursor-pointer transition-all"
                 >
-                  Return to Landing Page
+                  {t('modal_success_return', currentLang)}
                 </button>
 
                 <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant justify-center mt-2">

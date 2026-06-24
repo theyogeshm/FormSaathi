@@ -1,6 +1,11 @@
 import React from 'react';
+import { t } from '../translations';
 
-export default function Footer() {
+interface FooterProps {
+  currentLang: string;
+}
+
+export default function Footer({ currentLang }: FooterProps) {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -18,37 +23,37 @@ export default function Footer() {
             FormSaathi
           </div>
           <p className="text-sm text-white/70 leading-relaxed max-w-sm">
-            Agentic AI bridge between traditional banking and modern efficiency. Built for institutional reliability.
+            {t('tagline_short', currentLang)}
           </p>
         </div>
 
         {/* Product links (3 cols) */}
         <div className="md:col-span-3 space-y-3">
-          <h6 className="font-bold text-xs uppercase tracking-widest text-white">Product</h6>
+          <h6 className="font-bold text-xs uppercase tracking-widest text-white">{t('product', currentLang)}</h6>
           <ul className="space-y-2 text-sm text-white/70">
-            <li><a href="#solution" className="hover:text-secondary-container transition-colors whitespace-nowrap">Solutions</a></li>
-            <li><a href="#features" className="hover:text-secondary-container transition-colors whitespace-nowrap">Security</a></li>
-            <li><a href="#how-it-works" className="hover:text-secondary-container transition-colors whitespace-nowrap">API Documentation</a></li>
+            <li><a href="#solution" className="hover:text-secondary-container transition-colors whitespace-nowrap">{t('solutions', currentLang)}</a></li>
+            <li><a href="#features" className="hover:text-secondary-container transition-colors whitespace-nowrap">{t('security', currentLang)}</a></li>
+            <li><a href="#how-it-works" className="hover:text-secondary-container transition-colors whitespace-nowrap">{t('api_doc', currentLang)}</a></li>
           </ul>
         </div>
 
         {/* Company links (3 cols) */}
         <div className="md:col-span-3 space-y-3">
-          <h6 className="font-bold text-xs uppercase tracking-widest text-white">Company</h6>
+          <h6 className="font-bold text-xs uppercase tracking-widest text-white">{t('company', currentLang)}</h6>
           <ul className="space-y-2 text-sm text-white/70">
-            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">About Us</a></li>
-            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">Careers</a></li>
-            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">Press Kit</a></li>
+            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">{t('about_us', currentLang)}</a></li>
+            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">{t('careers', currentLang)}</a></li>
+            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">{t('press_kit', currentLang)}</a></li>
           </ul>
         </div>
 
         {/* Legal links (3 cols) */}
         <div className="md:col-span-3 space-y-3">
-          <h6 className="font-bold text-xs uppercase tracking-widest text-white">Legal</h6>
+          <h6 className="font-bold text-xs uppercase tracking-widest text-white">{t('legal', currentLang)}</h6>
           <ul className="space-y-2 text-sm text-white/70">
-            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">Privacy Policy</a></li>
-            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">Terms of Service</a></li>
-            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">Compliance</a></li>
+            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">{t('privacy_policy', currentLang)}</a></li>
+            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">{t('terms_of_service', currentLang)}</a></li>
+            <li><a href="#" className="hover:text-secondary-container transition-colors whitespace-nowrap">{t('compliance', currentLang)}</a></li>
           </ul>
         </div>
 
@@ -56,8 +61,8 @@ export default function Footer() {
 
       {/* Bottom section line */}
       <div className="max-w-7xl mx-auto px-6 mt-10 pt-6 border-t border-white/10 text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-white/50">
-        <p>© 2024-2026 FormSaathi AI. Effortless Security in Banking.</p>
-        <p className="hover:text-white transition-colors cursor-pointer" onClick={scrollToTop}>Back to Top ↑</p>
+        <p>{t('copyright', currentLang)}</p>
+        <p className="hover:text-white transition-colors cursor-pointer" onClick={scrollToTop}>{t('back_to_top', currentLang)}</p>
       </div>
 
     </footer>
