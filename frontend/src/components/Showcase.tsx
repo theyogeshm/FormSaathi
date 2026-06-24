@@ -96,6 +96,9 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
   // Active User record from CSV
   const [activeUserRecord, setActiveUserRecord] = useState<Record<string, string> | null>(null);
 
+  // Autofill status message for demo feedback
+  const [autofillStatusMessage, setAutofillStatusMessage] = useState<string>('');
+
   // Handle active tab changes
   useEffect(() => {
     resetDemoState();
@@ -116,6 +119,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
     setUploadedImageSrc(null);
     setPendingUploadedDoc(null);
     setActiveUserRecord(null);
+    setAutofillStatusMessage('');
     // Clear form fields
     const cleared = selectedTemplate.fields.map(f => ({ ...f, value: '', confidence: 0 }));
     setFormFields(cleared);
@@ -328,11 +332,50 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
     }
   };
 
+  // Helper to map CSV user record to SBI Nomination Form (DA-1) fields
+  const getDa1DataToFill = (currentUser: Record<string, string>) => {
+    let relationship = '';
+    let age = '';
+    let dob = '';
+    let guardian = '';
+    let guardianAddr = '';
+    
+    if (currentUser.nominee_name) {
+      if (currentUser.nominee_name === 'Pratik Kumar') {
+        relationship = 'Son';
+        age = '12';
+        dob = '2014-06-24';
+        guardian = currentUser.full_name || '';
+        guardianAddr = (currentUser.address || '') + ' (Age: ' + String(2026 - Number((currentUser.dob || '1980').split('-')[0])) + ')';
+      } else {
+        relationship = currentUser.nominee_name.includes('Sharma') || currentUser.nominee_name.includes('Irfan') || currentUser.nominee_name.includes('Verma') || currentUser.nominee_name.includes('Kumar') || currentUser.nominee_name.includes('Singh') || currentUser.nominee_name.includes('Joshi') ? 'Spouse' : 'Family Member';
+        age = '35';
+      }
+    }
+
+    return {
+      fullName: currentUser.full_name ? `${currentUser.full_name}, residing at ${currentUser.address || ''}${currentUser.pincode ? ' - ' + currentUser.pincode : ''}` : '',
+      branchName: 'Patna Main Branch',
+      depositNature: currentUser.account_type === 'Savings' ? 'Savings Bank Account' : currentUser.account_type === 'Current' ? 'Current Account' : currentUser.account_type || 'Savings Bank Account',
+      depositDistNo: '39485720194',
+      depositDetails: 'Mobile: ' + (currentUser.mobile || 'N/A'),
+      nomineeName: currentUser.nominee_name || '',
+      nomineeAddress: currentUser.nominee_name ? `${currentUser.address || ''}${currentUser.mobile ? ', Mob: ' + currentUser.mobile : ''}` : '',
+      nomineeRelationship: relationship,
+      nomineeAge: age,
+      nomineeDob: dob,
+      guardianName: guardian,
+      guardianAddress: guardianAddr,
+      printNomineeName: currentUser.nominee_name ? 'Yes' : 'No',
+    };
+  };
+
   // Trigger Scanning & Parsing Sequence
   const triggerScanningSequence = (unusedData: Record<string, string>, source: 'document' | 'voice') => {
     setIsScanning(true);
     setScanProgress(0);
-    setScanningStatus('Initializing Vision AI engine...');
+    setScanningStatus('Scanning form...');
+    setAutofillStatusMessage('');
 
     // Select or reuse the active user record from the CSV
     let currentUser = activeUserRecord;
@@ -342,24 +385,13 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
       setActiveUserRecord(currentUser);
     }
 
-    const dataToFill: Record<string, string> = {
-      fullName: currentUser.full_name || '',
-      fatherName: currentUser.father_spouse_name || '',
-      dob: currentUser.dob || '',
-      gender: currentUser.gender || '',
-      phone: currentUser.mobile || '',
-      address: currentUser.address || '',
-      pincode: currentUser.pincode || '',
-      accountType: currentUser.account_type === 'Savings' ? 'Savings Bank Account' : currentUser.account_type === 'Current' ? 'Current Account' : currentUser.account_type || '',
-      nomineeName: currentUser.nominee_name || '',
-    };
+    const dataToFill = getDa1DataToFill(currentUser);
 
     const statuses = [
-      { progress: 15, msg: 'Detecting document borders and layout...' },
-      { progress: 35, msg: 'Performing optical character recognition (OCR)...' },
-      { progress: 55, msg: 'Parsing fields & mapping against banking standards...' },
-      { progress: 75, msg: 'Validating field logic (Aadhaar/PAN structure)...' },
-      { progress: 95, msg: 'Form mapped successfully!' },
+      { progress: 20, msg: 'Scanning form...' },
+      { progress: 50, msg: 'Detecting fields...' },
+      { progress: 80, msg: 'Preparing digital replica...' },
+      { progress: 100, msg: 'Form mapped successfully!' },
     ];
 
     let currentStep = 0;
@@ -372,25 +404,40 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
         clearInterval(interval);
         setTimeout(() => {
           setIsScanning(false);
+          
+          // Force SBI Nomination Form (DA-1) for this demo
+          const sbiDa1Template = FORM_TEMPLATES.find(t => t.id === 'sbi_da1') || FORM_TEMPLATES[0];
+          setSelectedTemplate(sbiDa1Template);
+
+          if (!selectedDoc) {
+            setSelectedDoc({
+              id: 'blank_sbi_da1',
+              name: 'SBI Nomination Form (DA-1)',
+              type: 'form',
+              image: '📝',
+              fields: {}
+            });
+          }
+          
           // Auto fill fields one by one with micro-animation
-          autoFillFormFields(dataToFill, currentUser!);
+          autoFillFormFields(dataToFill, currentUser!, sbiDa1Template.fields);
         }, 500);
       }
     }, 600);
   };
 
   // Auto-fill form fields one by one
-  const autoFillFormFields = (dataToFill: Record<string, string>, currentUser: Record<string, string>) => {
+  const autoFillFormFields = (dataToFill: Record<string, string>, currentUser: Record<string, string>, fields: FormField[]) => {
     // We clear current fields first
-    setFormFields(prev => prev.map(f => ({ ...f, value: '', confidence: 0 })));
+    setFormFields(fields.map(f => ({ ...f, value: '', confidence: 0 })));
 
     let index = 0;
     const interval = setInterval(() => {
-      if (index < selectedTemplate.fields.length) {
-        const templateField = selectedTemplate.fields[index];
+      if (index < fields.length) {
+        const templateField = fields[index];
         const mappedValue = dataToFill[templateField.id];
         
-        if (mappedValue) {
+        if (mappedValue !== undefined && mappedValue !== '') {
           const fieldId = templateField.id;
           setFormFields(prev => prev.map((f) => {
             if (f.id === fieldId) {
@@ -398,7 +445,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                 ...f, 
                 value: mappedValue, 
                 confidence: Math.floor(Math.random() * 6) + 94, // 94% to 99%
-                mappedFrom: selectedDoc ? selectedDoc.name : 'Voice Input'
+                mappedFrom: selectedDoc ? selectedDoc.name : 'Uploaded File'
               };
             }
             return f;
@@ -407,6 +454,19 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
         index++;
       } else {
         clearInterval(interval);
+
+        // Check for nominee reminder flow or success message
+        if (activeTab === 'photo') {
+          if (!currentUser.nominee_name) {
+            // Trigger the existing nominee reminder flow
+            setTimeout(() => {
+              setActiveTab('voice');
+              handleStartVoiceSim(currentUser);
+            }, 1500);
+          } else {
+            setAutofillStatusMessage('Auto-filled successfully ✓');
+          }
+        }
       }
     }, 350);
   };
@@ -564,35 +624,25 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
     const currentUser = csvRecords[randomIndex];
     setActiveUserRecord(currentUser);
 
-    // Helper to generate a fake PAN number
-    const dataToFill: Record<string, string> = {
-      fullName: currentUser.full_name || '',
-      fatherName: currentUser.father_spouse_name || '',
-      dob: currentUser.dob || '',
-      gender: currentUser.gender || '',
-      phone: currentUser.mobile || '',
-      address: currentUser.address || '',
-      pincode: currentUser.pincode || '',
-      accountType: currentUser.account_type === 'Savings' ? 'Savings Bank Account' : currentUser.account_type === 'Current' ? 'Current Account' : currentUser.account_type || '',
-      nomineeName: currentUser.nominee_name || 'Kavya Kumar', // default if empty
-      panNo: '',
-      aadhaarNo: '',
-      monthlyIncome: String(Math.floor(Math.random() * 50 + 40) * 1000), // 40k to 90k
-      employerName: ['Tata Consultancy Services', 'Infosys Limited', 'Wipro Technologies', 'HDFC Bank Ltd', 'Reliance Industries'][Math.floor(Math.random() * 5)],
-      loanAmount: String(Math.floor(Math.random() * 8 + 3) * 100000), // 3L to 10L
-    };
+    const sbiDa1Template = FORM_TEMPLATES.find(t => t.id === 'sbi_da1') || FORM_TEMPLATES[0];
+    setSelectedTemplate(sbiDa1Template);
+    setAutofillStatusMessage('');
 
-    setFormFields(prev => prev.map(f => {
-      if (f.id === 'panNo' || f.id === 'aadhaarNo') {
-        return {
-          ...f,
-          value: '',
-          confidence: 0,
-          mappedFrom: undefined
-        };
-      }
+    if (!selectedDoc) {
+      setSelectedDoc({
+        id: 'blank_sbi_da1',
+        name: 'SBI Nomination Form (DA-1)',
+        type: 'form',
+        image: '📝',
+        fields: {}
+      });
+    }
+
+    const dataToFill = getDa1DataToFill(currentUser);
+
+    setFormFields(sbiDa1Template.fields.map(f => {
       const mappedValue = dataToFill[f.id];
-      if (mappedValue !== undefined) {
+      if (mappedValue !== undefined && mappedValue !== '') {
         return {
           ...f,
           value: mappedValue,
@@ -600,8 +650,18 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
           mappedFrom: 'Instant Autofill'
         };
       }
-      return f;
+      return { ...f, value: '', confidence: 0, mappedFrom: undefined };
     }));
+
+    // Check if nominee exists to either trigger voice simulation or success status
+    if (!currentUser.nominee_name) {
+      setTimeout(() => {
+        setActiveTab('voice');
+        handleStartVoiceSim(currentUser);
+      }, 1500);
+    } else {
+      setAutofillStatusMessage('Auto-filled successfully ✓');
+    }
   };
 
   // Check if any field is filled
@@ -622,6 +682,9 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
           <p className="text-body-md text-on-surface-variant max-w-xl mx-auto">
             Choose your preferred mock interface below. Either photograph a blank form to recreate it, view a voice-guided conversation, or search our popular banking form library.
           </p>
+          <div className="bg-primary/5 border border-primary/20 py-2.5 px-4 rounded-xl max-w-xl mx-auto text-xs font-semibold text-primary leading-relaxed shadow-sm">
+            🛡️ Hackathon Demo: Currently demonstrates the workflow using a predefined SBI DA-1 Nomination Form. Production version will support dynamic form recognition and reconstruction.
+          </div>
         </div>
 
         {/* Tab Controls */}
@@ -797,14 +860,21 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                     {!isScanning && selectedDoc && (
                       <div className="space-y-4 animate-fade-in">
                         {/* Success banner */}
-                        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex gap-3 items-start">
-                          <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <h4 className="font-bold text-xs text-green-800">Form Structure Recreated</h4>
-                            <p className="text-[10px] text-green-700/90 mt-1">
-                              FormSaathi recreated <strong>{selectedDoc.name}</strong> digitally. No identity documents were uploaded—your privacy is preserved.
-                            </p>
+                        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex gap-3 items-start justify-between">
+                          <div className="flex gap-3 items-start">
+                            <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <h4 className="font-bold text-xs text-green-800">Form Structure Recreated</h4>
+                              <p className="text-[10px] text-green-700/90 mt-1">
+                                FormSaathi recreated <strong>{selectedDoc.name}</strong> digitally. No identity documents were uploaded—your privacy is preserved.
+                              </p>
+                            </div>
                           </div>
+                          {uploadedImageSrc && (
+                            <div className="w-12 h-16 border border-green-200 rounded bg-white overflow-hidden flex-shrink-0 flex items-center justify-center shadow-sm">
+                              <img src={uploadedImageSrc} className="w-full h-full object-cover" alt="Scanned Form Preview" />
+                            </div>
+                          )}
                         </div>
 
                         {/* Guided Assistant Panel */}
@@ -1223,7 +1293,13 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                     </span>
                     <span className="text-xs font-semibold text-on-surface-variant">
-                      {isAnyFieldFilled ? 'AI processing active' : 'Scan a blank form or search library to begin'}
+                      {autofillStatusMessage ? (
+                        <span className="text-green-600 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 animate-pulse" /> {autofillStatusMessage}
+                        </span>
+                      ) : (
+                        isAnyFieldFilled ? 'AI processing active' : 'Scan a blank form or search library to begin'
+                      )}
                     </span>
                   </div>
 
