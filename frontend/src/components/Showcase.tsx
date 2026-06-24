@@ -97,6 +97,20 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
   const [uploadedImageSrc, setUploadedImageSrc] = useState<string | null>(null);
   const [pendingUploadedDoc, setPendingUploadedDoc] = useState<DemoDocument | null>(null);
 
+  // Mobile-specific upload refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.matchMedia('(max-width: 767px) and (pointer: coarse)').matches);
+    check();
+    const mq = window.matchMedia('(max-width: 767px) and (pointer: coarse)');
+    mq.addEventListener('change', check);
+    return () => mq.removeEventListener('change', check);
+  }, []);
+
   // Active User record from CSV
   const [activeUserRecord, setActiveUserRecord] = useState<Record<string, string> | null>(null);
 
@@ -1755,21 +1769,66 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                   <div className="space-y-6">
                     {/* Simulated File Drop area */}
                     {!isScanning && !selectedDoc && !uploadedImageSrc && (
-                      <div className="border-2 border-dashed border-outline-variant/60 rounded-2xl p-6 sm:p-8 flex flex-col items-center text-center hover:border-primary transition-colors relative cursor-pointer group">
-                        <input 
-                          type="file" 
-                          accept="image/*" 
+                      <div className="border-2 border-dashed border-outline-variant/60 rounded-2xl p-6 sm:p-8 flex flex-col items-center text-center hover:border-primary transition-colors group">
+                        {/* Hidden inputs - desktop combined, mobile split */}
+                        {!isMobile && (
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileUploadSim}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+                          />
+                        )}
+                        {/* Hidden gallery input (mobile) */}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
                           onChange={handleFileUploadSim}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          className="hidden"
+                        />
+                        {/* Hidden camera input (mobile) */}
+                        <input
+                          ref={cameraInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleFileUploadSim}
+                          className="hidden"
                         />
                         <Upload className="w-10 h-10 text-on-surface-variant/70 mb-4 group-hover:scale-110 transition-transform duration-300" />
                         <h4 className="font-bold text-sm text-on-surface mb-1">{t('sh_upload_title', formLang)}</h4>
                         <p className="text-xs text-on-surface-variant max-w-[200px] mb-3">
                           {t('sh_upload_desc', formLang)}
                         </p>
-                        <button type="button" className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl pointer-events-none shadow-sm hover:bg-primary-container transition-colors">
-                          Choose Image / Camera
-                        </button>
+                        {/* Desktop: single overlay button */}
+                        {!isMobile && (
+                          <button type="button" className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl pointer-events-none shadow-sm hover:bg-primary-container transition-colors">
+                            Choose Image
+                          </button>
+                        )}
+                        {/* Mobile: two explicit buttons */}
+                        {isMobile && (
+                          <div className="flex gap-3 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="flex items-center gap-1.5 px-4 py-2.5 bg-surface-container border border-outline-variant/40 text-on-surface text-xs font-bold rounded-xl shadow-sm active:scale-95 transition-transform"
+                            >
+                              <Upload className="w-4 h-4" />
+                              Gallery
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => cameraInputRef.current?.click()}
+                              className="flex items-center gap-1.5 px-4 py-2.5 bg-primary text-white text-xs font-bold rounded-xl shadow-sm active:scale-95 transition-transform"
+                            >
+                              <Camera className="w-4 h-4" />
+                              Camera
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
 
