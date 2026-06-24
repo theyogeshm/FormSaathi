@@ -90,6 +90,8 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
   // Guided Walkthrough states
   const [guidedFieldIndex, setGuidedFieldIndex] = useState<number>(-1);
   const [isWalkthroughPlaying, setIsWalkthroughPlaying] = useState<boolean>(false);
+  const [isTypingComplete, setIsTypingComplete] = useState<boolean>(false);
+  const [hasVoicePlayedForField, setHasVoicePlayedForField] = useState<boolean>(false);
 
   // Upload preview states
   const [uploadedImageSrc, setUploadedImageSrc] = useState<string | null>(null);
@@ -123,10 +125,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     resetDemoState();
   }, [activeTab]);
 
-  // Stop any in-progress TTS when the guided field advances
-  useEffect(() => {
-    if (guidedFieldIndex >= 0) stopSpeech();
-  }, [guidedFieldIndex]);
+
 
   // Reset states
   const resetDemoState = () => {
@@ -147,6 +146,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     // Clear form fields
     const cleared = selectedTemplate.fields.map(f => ({ ...f, value: '', confidence: 0 }));
     setFormFields(cleared);
+    stopSpeech();
   };
 
   // Language BCP-47 code mapping for Web Speech API
@@ -1287,7 +1287,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     setFormFields(prev => prev.map(f => ({ ...f, value: '', confidence: 0 })));
   };
 
-  // Walkthrough simulation runner effect
+  // Walkthrough simulation runner effect (Typing ONLY)
   useEffect(() => {
     if (!isWalkthroughPlaying || guidedFieldIndex < 0 || guidedFieldIndex >= formFields.length) {
       if (isWalkthroughPlaying && guidedFieldIndex >= formFields.length) {
@@ -1314,12 +1314,13 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
       targetValue = dataToFill[currentField.id] || '';
     }
 
+    setIsTypingComplete(false);
+    setHasVoicePlayedForField(false);
+
     if (!targetValue) {
       setFormFields(prev => prev.map(f => f.id === currentField.id ? { ...f, value: 'N/A', confidence: 100 } : f));
-      const nextTimer = setTimeout(() => {
-        setGuidedFieldIndex(prev => prev + 1);
-      }, 1000);
-      return () => clearTimeout(nextTimer);
+      setIsTypingComplete(true);
+      return;
     }
 
     let currentText = '';
@@ -1333,12 +1334,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
       } else {
         clearInterval(typingInterval);
         setFormFields(prev => prev.map(f => f.id === currentField.id ? { ...f, value: targetValue, confidence: 100 } : f));
-        
-        const nextTimer = setTimeout(() => {
-          setGuidedFieldIndex(prev => prev + 1);
-        }, 1500);
-
-        return () => clearTimeout(nextTimer);
+        setIsTypingComplete(true);
       }
     }, 60);
 
@@ -1346,6 +1342,48 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
       clearInterval(typingInterval);
     };
   }, [isWalkthroughPlaying, guidedFieldIndex, formFields.length, activeUserRecord]);
+
+  // Track if voice starts playing during the walkthrough for the current field
+  useEffect(() => {
+    if (isSpeaking && isWalkthroughPlaying) {
+      setHasVoicePlayedForField(true);
+    }
+  }, [isSpeaking, isWalkthroughPlaying]);
+
+  // Walkthrough simulation progression effect
+  useEffect(() => {
+    if (!isWalkthroughPlaying || !isTypingComplete || guidedFieldIndex < 0 || guidedFieldIndex >= formFields.length) {
+      return;
+    }
+
+    // If voice is currently playing, pause automatic progression
+    if (isSpeaking) {
+      console.log("[FormSaathi Walkthrough] Voice is active. Pausing automatic field progression.");
+      return;
+    }
+
+    // Determine target delay for field transition
+    let delay = 1500; // default delay if voice was played and finished
+
+    if (!hasVoicePlayedForField) {
+      // User did not play the voice: pause long enough for displayed guidance to be read.
+      const currentField = formFields[guidedFieldIndex];
+      const info = getFieldGuidance(currentField.id);
+      const textLength = (info.tip || '').length + (info.regional || '').length + (info.reason || '').length;
+
+      // Base timing: 35ms per character with a minimum of 5 seconds (5000ms)
+      delay = Math.max(5000, textLength * 35);
+      console.log(`[FormSaathi Walkthrough] No voice playback. Dynamic reading delay: ${delay}ms for ${textLength} chars.`);
+    } else {
+      console.log("[FormSaathi Walkthrough] Voice playback completed. Transitioning to next field in 1500ms.");
+    }
+
+    const nextTimer = setTimeout(() => {
+      setGuidedFieldIndex(prev => prev + 1);
+    }, delay);
+
+    return () => clearTimeout(nextTimer);
+  }, [isWalkthroughPlaying, isTypingComplete, guidedFieldIndex, isSpeaking, hasVoicePlayedForField, formFields]);
 
   // Soundwave animation effect
   useEffect(() => {
