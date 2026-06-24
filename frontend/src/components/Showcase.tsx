@@ -110,6 +110,11 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     resetDemoState();
   }, [activeTab]);
 
+  // Stop any in-progress TTS when the guided field advances
+  useEffect(() => {
+    if (guidedFieldIndex >= 0) stopSpeech();
+  }, [guidedFieldIndex]);
+
   // Reset states
   const resetDemoState = () => {
     setSelectedDoc(null);
@@ -913,7 +918,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                                     </div>
 
                                     {/* Regional */}
-                                    {info.regional && (
+                                    {currentLang !== 'en' && info.regional && (
                                       <div className="space-y-1 pt-1">
                                         <div className="flex items-center justify-between">
                                           <span className="text-[9px] font-bold text-primary uppercase">{t('sh_guide_reg_label', currentLang)}</span>
@@ -966,6 +971,15 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                                         </span>
                                       )}
                                     </span>
+                                    {isSpeaking && (
+                                      <button
+                                        type="button"
+                                        onClick={stopSpeech}
+                                        className="flex items-center gap-1 text-[10px] font-bold text-red-500 border border-red-200 bg-red-50 px-2.5 py-1 rounded-full hover:bg-red-100 cursor-pointer transition-colors"
+                                      >
+                                        <VolumeX className="w-3 h-3" /> Stop
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               );
