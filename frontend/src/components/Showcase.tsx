@@ -101,6 +101,10 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
   // TTS Voice Assistance state
   const [activeSpeechId, setActiveSpeechId] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  // 'idle' | 'playing' | 'paused' | 'stopped'
+  const [speechStatus, setSpeechStatus] = useState<'idle' | 'playing' | 'paused' | 'stopped'>('idle');
+  // label of voice currently in use (dev console badge)
+  const [activeVoiceLabel, setActiveVoiceLabel] = useState<string>('');
 
   // Autofill status message for demo feedback
   const [autofillStatusMessage, setAutofillStatusMessage] = useState<string>('');
@@ -145,7 +149,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     setFormFields(cleared);
   };
 
-  // Language code mapping for Web Speech API
+  // Language BCP-47 code mapping for Web Speech API
   const getLangCode = (lang: string): string => {
     const map: Record<string, string> = {
       en: 'en-IN',
@@ -159,25 +163,113 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     return map[lang] || 'en-IN';
   };
 
-  // Speak text using Web Speech API
+  /**
+   * Pick the best available SpeechSynthesisVoice for a given BCP-47 lang code.
+   * Priority: exact match → region-prefix match → en-US/en-GB fallback → first available.
+   * Logs selected voice to console for dev debugging.
+   */
+  const getBestVoice = (langCode: string): SpeechSynthesisVoice | null => {
+    if (!('speechSynthesis' in window)) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length === 0) return null;
+
+    // 1. Exact BCP-47 match (e.g. 'hi-IN')
+    let voice = voices.find(v => v.lang === langCode) ?? null;
+
+    // 2. Language prefix match (e.g. lang starts with 'hi')
+    if (!voice) {
+      const prefix = langCode.split('-')[0];
+      voice = voices.find(v => v.lang.startsWith(prefix)) ?? null;
+      if (voice) console.warn(`[FormSaathi TTS] No exact voice for ${langCode}. Using fallback: ${voice.name} (${voice.lang})`);
+    }
+
+    // 3. Fall back to any English voice
+    if (!voice) {
+      voice = voices.find(v => v.lang.startsWith('en-IN')) ??
+              voices.find(v => v.lang.startsWith('en-US')) ??
+              voices.find(v => v.lang.startsWith('en')) ?? null;
+      if (voice) console.warn(`[FormSaathi TTS] No ${langCode} voice found. Using English fallback: ${voice.name} (${voice.lang})`);
+    }
+
+    // 4. Last resort: first available voice
+    if (!voice && voices.length > 0) {
+      voice = voices[0];
+      console.warn(`[FormSaathi TTS] Using first available voice: ${voice.name}`);
+    }
+
+    if (voice) console.info(`[FormSaathi TTS] ✓ Voice selected: "${voice.name}" lang=${voice.lang} local=${voice.localService}`);
+    return voice;
+  };
+
+  // Speak text using Web Speech API with improved quality settings
   const speakText = (text: string, speechId: string, lang?: string) => {
     if (!('speechSynthesis' in window)) return;
-    // Stop any ongoing speech
+
+    // Always cancel any ongoing speech first
     window.speechSynthesis.cancel();
-    // If same button clicked while playing → toggle off
+
+    // Same button clicked while playing → toggle off (stop)
     if (activeSpeechId === speechId && isSpeaking) {
       setActiveSpeechId(null);
       setIsSpeaking(false);
+      setSpeechStatus('stopped');
+      setActiveVoiceLabel('');
       return;
     }
+
+    const targetLang = lang || getLangCode(formLang);
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang || getLangCode(formLang);
-    utterance.rate = 0.92;
-    utterance.pitch = 1;
-    utterance.onstart = () => { setActiveSpeechId(speechId); setIsSpeaking(true); };
-    utterance.onend = () => { setActiveSpeechId(null); setIsSpeaking(false); };
-    utterance.onerror = () => { setActiveSpeechId(null); setIsSpeaking(false); };
-    window.speechSynthesis.speak(utterance);
+    utterance.lang = targetLang;
+    utterance.rate   = 0.95;  // clear, slightly slower than default
+    utterance.pitch  = 1.0;   // natural pitch
+    utterance.volume = 1.0;   // maximum volume
+
+    // Assign best available voice — must call getVoices() after cancel()
+    const voice = getBestVoice(targetLang);
+    if (voice) {
+      utterance.voice = voice;
+      setActiveVoiceLabel(`${voice.name} (${voice.lang})`);
+    } else {
+      setActiveVoiceLabel('default');
+    }
+
+    utterance.onstart = () => {
+      setActiveSpeechId(speechId);
+      setIsSpeaking(true);
+      setSpeechStatus('playing');
+    };
+    utterance.onpause = () => {
+      setSpeechStatus('paused');
+    };
+    utterance.onresume = () => {
+      setSpeechStatus('playing');
+    };
+    utterance.onend = () => {
+      setActiveSpeechId(null);
+      setIsSpeaking(false);
+      setSpeechStatus('idle');
+      setActiveVoiceLabel('');
+    };
+    utterance.onerror = (e) => {
+      console.error('[FormSaathi TTS] Error:', e.error);
+      setActiveSpeechId(null);
+      setIsSpeaking(false);
+      setSpeechStatus('idle');
+      setActiveVoiceLabel('');
+    };
+
+    // Chrome bug workaround: voices may not be loaded yet on first call.
+    // Re-check voices after a brief delay if the list was empty.
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        const v2 = getBestVoice(targetLang);
+        if (v2) { utterance.voice = v2; setActiveVoiceLabel(`${v2.name} (${v2.lang})`); }
+        window.speechSynthesis.onvoiceschanged = null;
+        window.speechSynthesis.speak(utterance);
+      };
+    } else {
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   // Stop all speech
@@ -185,6 +277,8 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     setActiveSpeechId(null);
     setIsSpeaking(false);
+    setSpeechStatus('stopped');
+    setActiveVoiceLabel('');
   };
 
   // Field focus handler
@@ -980,15 +1074,34 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                                         </span>
                                       )}
                                     </span>
-                                    {isSpeaking && (
-                                      <button
-                                        type="button"
-                                        onClick={stopSpeech}
-                                        className="flex items-center gap-1 text-[10px] font-bold text-red-500 border border-red-200 bg-red-50 px-2.5 py-1 rounded-full hover:bg-red-100 cursor-pointer transition-colors"
-                                      >
-                                        <VolumeX className="w-3 h-3" /> Stop
-                                      </button>
-                                    )}
+                                    <div className="flex items-center gap-1.5">
+                                      {/* Speech status pill */}
+                                      {speechStatus === 'playing' && (
+                                        <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full animate-pulse">
+                                          <Volume2 className="w-3 h-3" /> Playing…
+                                        </span>
+                                      )}
+                                      {speechStatus === 'paused' && (
+                                        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                                          ⏸ Paused
+                                        </span>
+                                      )}
+                                      {speechStatus === 'stopped' && (
+                                        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">
+                                          ⏹ Stopped
+                                        </span>
+                                      )}
+                                      {/* Stop button — visible while playing or paused */}
+                                      {isSpeaking && (
+                                        <button
+                                          type="button"
+                                          onClick={stopSpeech}
+                                          className="flex items-center gap-1 text-[10px] font-bold text-red-500 border border-red-200 bg-red-50 px-2.5 py-1 rounded-full hover:bg-red-100 cursor-pointer transition-colors"
+                                        >
+                                          <VolumeX className="w-3 h-3" /> Stop
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -1000,6 +1113,15 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                                   ? t('sh_autofill_success', formLang) 
                                   : t('sh_status_scan_begin', formLang)}
                               </p>
+                            </div>
+                          )}
+
+                          {/* Dev voice debug badge — shows which TTS voice was selected */}
+                          {activeVoiceLabel && (
+                            <div className="mt-1 px-2 py-1 bg-slate-100 border border-slate-200 rounded-lg">
+                              <span className="text-[9px] font-mono text-slate-500">
+                                🎙 Voice: <span className="font-bold text-slate-700">{activeVoiceLabel}</span>
+                              </span>
                             </div>
                           )}
 
