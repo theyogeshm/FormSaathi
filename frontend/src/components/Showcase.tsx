@@ -568,6 +568,66 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
     }, 1800);
   };
 
+  // Instant autofill using random record from CSV
+  const handleInstantAutofill = () => {
+    if (csvRecords.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * csvRecords.length);
+    const currentUser = csvRecords[randomIndex];
+    setActiveUserRecord(currentUser);
+
+    // Helper to generate a fake PAN number
+    const generatePAN = () => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const nums = '0123456789';
+      let pan = '';
+      for (let i = 0; i < 5; i++) pan += chars[Math.floor(Math.random() * chars.length)];
+      for (let i = 0; i < 4; i++) pan += nums[Math.floor(Math.random() * nums.length)];
+      pan += chars[Math.floor(Math.random() * chars.length)];
+      return pan;
+    };
+
+    // Helper to generate a fake Aadhaar number
+    const generateAadhaar = () => {
+      const nums = '0123456789';
+      let aadhaar = '';
+      for (let i = 0; i < 12; i++) {
+        if (i > 0 && i % 4 === 0) aadhaar += ' ';
+        aadhaar += nums[Math.floor(Math.random() * nums.length)];
+      }
+      return aadhaar;
+    };
+
+    const dataToFill: Record<string, string> = {
+      fullName: currentUser.full_name || '',
+      fatherName: currentUser.father_spouse_name || '',
+      dob: currentUser.dob || '',
+      gender: currentUser.gender || '',
+      phone: currentUser.mobile || '',
+      address: currentUser.address || '',
+      pincode: currentUser.pincode || '',
+      accountType: currentUser.account_type === 'Savings' ? 'Savings Bank Account' : currentUser.account_type === 'Current' ? 'Current Account' : currentUser.account_type || '',
+      nomineeName: currentUser.nominee_name || 'Kavya Kumar', // default if empty
+      panNo: generatePAN(),
+      aadhaarNo: generateAadhaar(),
+      monthlyIncome: String(Math.floor(Math.random() * 50 + 40) * 1000), // 40k to 90k
+      employerName: ['Tata Consultancy Services', 'Infosys Limited', 'Wipro Technologies', 'HDFC Bank Ltd', 'Reliance Industries'][Math.floor(Math.random() * 5)],
+      loanAmount: String(Math.floor(Math.random() * 8 + 3) * 100000), // 3L to 10L
+    };
+
+    setFormFields(prev => prev.map(f => {
+      const mappedValue = dataToFill[f.id];
+      if (mappedValue !== undefined) {
+        return {
+          ...f,
+          value: mappedValue,
+          confidence: Math.floor(Math.random() * 6) + 94, // 94% to 99%
+          mappedFrom: 'Instant Autofill'
+        };
+      }
+      return f;
+    }));
+  };
+
   // Check if any field is filled
   const isAnyFieldFilled = formFields.some(f => f.value !== '');
 
@@ -849,13 +909,24 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
 
                           <div className="flex gap-2 pt-2">
                             {!isWalkthroughPlaying && guidedFieldIndex < formFields.length && (
-                              <button
-                                onClick={() => startGuidedWalkthrough(selectedDoc.fields)}
-                                className="flex-1 bg-primary text-white hover:bg-primary-container py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow hover:scale-102 transform active:scale-95 transition-all"
-                              >
-                                <Sparkles className="w-3.5 h-3.5" />
-                                Simulate Guided Fill
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => startGuidedWalkthrough(selectedDoc.fields)}
+                                  className="flex-grow bg-primary text-white hover:bg-primary-container py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow hover:scale-102 transform active:scale-95 transition-all"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  Simulate Guided Fill
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleInstantAutofill}
+                                  className="bg-secondary text-white hover:bg-secondary-container py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow hover:scale-102 transform active:scale-95 transition-all"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                                  Instant Fill
+                                </button>
+                              </>
                             )}
                             {isWalkthroughPlaying && (
                               <button
@@ -1180,14 +1251,25 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                     </span>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={!isAnyFieldFilled}
-                    className={`w-full sm:w-auto px-6 py-3 rounded-full font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${isAnyFieldFilled ? 'bg-secondary text-white hover:bg-secondary-container hover:shadow-lg hover:scale-102' : 'bg-surface-container-highest text-on-surface-variant/40 cursor-not-allowed border'}`}
-                  >
-                    <Download className="w-4 h-4" />
-                    Download Form & QR Code
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={handleInstantAutofill}
+                      className="w-full sm:w-auto px-5 py-3 rounded-full font-bold text-sm bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4 text-secondary animate-pulse" />
+                      Auto-fill Form
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={!isAnyFieldFilled}
+                      className={`w-full sm:w-auto px-6 py-3 rounded-full font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${isAnyFieldFilled ? 'bg-secondary text-white hover:bg-secondary-container hover:shadow-lg hover:scale-102' : 'bg-surface-container-highest text-on-surface-variant/40 cursor-not-allowed border'}`}
+                    >
+                      <Download className="w-4 h-4" />
+                      Download Form & QR Code
+                    </button>
+                  </div>
                 </div>
               </form>
 
