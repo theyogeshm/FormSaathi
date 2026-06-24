@@ -1677,7 +1677,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
 
   return (
     <section id="showcase" className="bg-background py-16 border-t border-outline-variant/20">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         
         {/* Section Headers */}
         <div className="text-center space-y-4 mb-10">
@@ -1696,11 +1696,11 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
         </div>
 
         {/* Tab Controls */}
-        <div className="flex justify-center gap-2 sm:gap-3 mb-10 max-w-xl mx-auto bg-surface-container-low p-1.5 rounded-full border border-outline-variant/30">
+        <div className="flex justify-start sm:justify-center overflow-x-auto scrollbar-none gap-2 sm:gap-3 mb-10 max-w-xl mx-auto bg-surface-container-low p-1.5 rounded-full border border-outline-variant/30">
           <button 
             type="button"
             onClick={() => setActiveTab('photo')}
-            className={`flex-1 py-2 px-3 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'photo' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
+            className={`flex-1 py-2 px-2.5 rounded-full font-bold text-[10px] sm:text-xs md:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'photo' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
             id="tab-photo-btn"
           >
             <Camera className="w-4 h-4" />
@@ -1709,7 +1709,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
           <button 
             type="button"
             onClick={() => setActiveTab('voice')}
-            className={`flex-1 py-2 px-3 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'voice' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
+            className={`flex-1 py-2 px-2.5 rounded-full font-bold text-[10px] sm:text-xs md:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'voice' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
             id="tab-voice-btn"
           >
             <Mic className="w-4 h-4" />
@@ -1718,7 +1718,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
           <button 
             type="button"
             onClick={() => setActiveTab('search')}
-            className={`flex-1 py-2 px-3 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'search' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
+            className={`flex-1 py-2 px-2.5 rounded-full font-bold text-[10px] sm:text-xs md:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'search' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
             id="tab-search-btn"
           >
             <Search className="w-4 h-4" />
@@ -1727,11 +1727,11 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
         </div>
 
         {/* Split Grid: Interactive Input Area & Active Form Viewer */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8 items-start">
           
           {/* LEFT PANEL: Input & Scan Area (5 columns) */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="bg-white rounded-3xl p-6 border border-outline-variant/30 shadow-md flex flex-col justify-between min-h-[460px]">
+          <div className="lg:col-span-5 space-y-4 lg:space-y-6">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-outline-variant/30 shadow-md flex flex-col justify-between min-h-[400px] sm:min-h-[460px]">
               
               {/* Tab Content Header */}
               <div className="border-b border-outline-variant/20 pb-4 mb-4">
@@ -1755,7 +1755,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                   <div className="space-y-6">
                     {/* Simulated File Drop area */}
                     {!isScanning && !selectedDoc && !uploadedImageSrc && (
-                      <div className="border-2 border-dashed border-outline-variant/60 rounded-2xl p-8 flex flex-col items-center text-center hover:border-primary transition-colors relative cursor-pointer group">
+                      <div className="border-2 border-dashed border-outline-variant/60 rounded-2xl p-6 sm:p-8 flex flex-col items-center text-center hover:border-primary transition-colors relative cursor-pointer group">
                         <input 
                           type="file" 
                           accept="image/*" 
@@ -1764,9 +1764,12 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                         />
                         <Upload className="w-10 h-10 text-on-surface-variant/70 mb-4 group-hover:scale-110 transition-transform duration-300" />
                         <h4 className="font-bold text-sm text-on-surface mb-1">{t('sh_upload_title', formLang)}</h4>
-                        <p className="text-xs text-on-surface-variant max-w-[200px]">
+                        <p className="text-xs text-on-surface-variant max-w-[200px] mb-3">
                           {t('sh_upload_desc', formLang)}
                         </p>
+                        <button type="button" className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl pointer-events-none shadow-sm hover:bg-primary-container transition-colors">
+                          Choose Image / Camera
+                        </button>
                       </div>
                     )}
 
@@ -1894,7 +1897,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                         </div>
 
                         {/* Guided Assistant Panel */}
-                        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 space-y-4 relative overflow-hidden">
+                        <div className="hidden lg:block bg-primary/5 border border-primary/20 rounded-2xl p-5 space-y-4 relative overflow-hidden">
                           <div className="flex justify-between items-center border-b border-primary/10 pb-2">
                             <span className="text-[10px] font-extrabold text-primary uppercase tracking-widest flex items-center gap-1.5">
                               <Sparkles className="w-3.5 h-3.5 text-secondary animate-pulse" /> {t('sh_ai_guide', formLang)}
@@ -2314,7 +2317,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
           {/* RIGHT PANEL: Live Banking Form Fill Area (7 columns) */}
           <div className="lg:col-span-7 space-y-4">
             
-            <div className="bg-white rounded-3xl p-6 border border-outline-variant/30 shadow-md flex flex-col min-h-[460px]">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-outline-variant/30 shadow-md flex flex-col min-h-[400px] sm:min-h-[460px]">
               
               {/* Form Header with Language Toggle */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant/20 pb-4 gap-4">
@@ -2347,49 +2350,140 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
               {/* Form Body Fields */}
               <form onSubmit={handleFormSubmit} className="flex-grow space-y-4 py-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {formFields.map((field) => {
+                  {formFields.map((field, idx) => {
                     const label = t('field_' + field.id, formLang);
                     const placeholder = t('holder_' + field.id, formLang);
+                    const isGuidedActive = guidedFieldIndex === idx;
+                    const info = getFieldGuidance(field.id);
                     return (
-                      <div key={field.id} className="space-y-1">
-                        <label className="text-xs font-bold text-on-surface flex items-center justify-between">
-                          <span>{label}</span>
-                          {field.confidence > 0 && (
-                            <span className="text-[9px] font-extrabold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
-                              {field.confidence}% Match
-                            </span>
+                      <React.Fragment key={field.id}>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-on-surface flex items-center justify-between">
+                            <span>{label}</span>
+                            {field.confidence > 0 && (
+                              <span className="text-[9px] font-extrabold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                                {field.confidence}% Match
+                              </span>
+                            )}
+                          </label>
+                          
+                          {field.type === 'select' ? (
+                            <select
+                              value={field.value}
+                              onFocus={() => handleFieldFocus(field.id)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setFormFields(prev => prev.map(f => f.id === field.id ? { ...f, value: val, confidence: 100 } : f));
+                              }}
+                              className={`w-full bg-surface border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary transition-all ${field.confidence > 0 ? 'border-green-300 ring-1 ring-green-100 bg-green-50/10' : 'border-outline-variant'}`}
+                            >
+                              <option value="">{t('sh_select', formLang)}...</option>
+                              {field.options?.map((opt, i) => (
+                                <option key={i} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input 
+                              type={field.type}
+                              placeholder={placeholder}
+                              value={field.value}
+                              onFocus={() => handleFieldFocus(field.id)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setFormFields(prev => prev.map(f => f.id === field.id ? { ...f, value: val, confidence: 100 } : f));
+                              }}
+                              className={`w-full bg-surface border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary transition-all ${field.confidence > 0 ? 'border-green-300 ring-1 ring-green-100 bg-green-50/10 font-medium' : 'border-outline-variant'}`}
+                            />
                           )}
-                        </label>
-                        
-                        {field.type === 'select' ? (
-                          <select
-                            value={field.value}
-                            onFocus={() => handleFieldFocus(field.id)}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setFormFields(prev => prev.map(f => f.id === field.id ? { ...f, value: val, confidence: 100 } : f));
-                            }}
-                            className={`w-full bg-surface border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary transition-all ${field.confidence > 0 ? 'border-green-300 ring-1 ring-green-100 bg-green-50/10' : 'border-outline-variant'}`}
-                          >
-                            <option value="">{t('sh_select', formLang)}...</option>
-                            {field.options?.map((opt, i) => (
-                              <option key={i} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input 
-                            type={field.type}
-                            placeholder={placeholder}
-                            value={field.value}
-                            onFocus={() => handleFieldFocus(field.id)}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setFormFields(prev => prev.map(f => f.id === field.id ? { ...f, value: val, confidence: 100 } : f));
-                            }}
-                            className={`w-full bg-surface border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary transition-all ${field.confidence > 0 ? 'border-green-300 ring-1 ring-green-100 bg-green-50/10 font-medium' : 'border-outline-variant'}`}
-                          />
+                        </div>
+
+                        {/* Inline Mobile Guidance Panel */}
+                        {isGuidedActive && (
+                          <div className="col-span-1 sm:col-span-2 block lg:hidden bg-primary/5 border border-primary/20 rounded-2xl p-4 space-y-3 animate-fade-in my-2">
+                            <div className="flex justify-between items-center border-b border-primary/10 pb-2">
+                              <span className="text-[9px] font-extrabold text-primary uppercase tracking-widest flex items-center gap-1.5">
+                                <Sparkles className="w-3 h-3 text-secondary animate-pulse" /> {t('sh_ai_guide', formLang)}
+                              </span>
+                              <span className="text-[9px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                                {guidedFieldIndex + 1} / {formFields.length}
+                              </span>
+                            </div>
+
+                            <div className="space-y-2 text-xs">
+                              {/* English Tip */}
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[9px] font-bold text-secondary uppercase">{t('sh_guide_tip_label', formLang)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => speakText(info.tip, `tip-${field.id}`, 'en-IN')}
+                                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border transition-all cursor-pointer ${activeSpeechId === `tip-${field.id}` && isSpeaking ? 'bg-secondary text-white border-secondary' : 'bg-white text-secondary border-secondary/50'}`}
+                                  >
+                                    {activeSpeechId === `tip-${field.id}` && isSpeaking ? 'Stop' : 'EN'}
+                                  </button>
+                                </div>
+                                <p className="text-on-surface bg-white p-2 rounded-lg border border-outline-variant/20 font-medium leading-relaxed">
+                                  {info.tip}
+                                </p>
+                              </div>
+
+                              {/* Regional Tip */}
+                              {formLang !== 'en' && info.regional && (
+                                <div className="space-y-1 pt-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-bold text-primary uppercase">{t('sh_guide_reg_label', formLang)}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => speakText(info.regional, `reg-${field.id}`)}
+                                      className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border transition-all cursor-pointer ${activeSpeechId === `reg-${field.id}` && isSpeaking ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-primary/50'}`}
+                                    >
+                                      {activeSpeechId === `reg-${field.id}` && isSpeaking ? 'Stop' : (formLang === 'hinglish' ? 'HI' : formLang.toUpperCase())}
+                                    </button>
+                                  </div>
+                                  <p className="text-on-surface-variant bg-white p-2 rounded-lg border border-outline-variant/20 font-semibold italic leading-relaxed">
+                                    {info.regional}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Why Explanation */}
+                              <div className="space-y-1 pt-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[9px] font-bold text-on-surface-variant uppercase">{t('sh_guide_why_label', formLang)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => speakText(info.reason, `why-${field.id}`)}
+                                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border transition-all cursor-pointer ${activeSpeechId === `why-${field.id}` && isSpeaking ? 'bg-on-surface-variant text-white border-on-surface-variant' : 'bg-white text-on-surface-variant border-outline-variant/50'}`}
+                                  >
+                                    {activeSpeechId === `why-${field.id}` && isSpeaking ? 'Stop' : 'Why'}
+                                  </button>
+                                </div>
+                                <p className="text-on-surface-variant text-[10px] leading-relaxed">
+                                  {info.reason}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Speech Status Pill */}
+                            <div className="flex items-center justify-between pt-2 border-t border-outline-variant/10 text-[9px] font-bold">
+                              <div className="flex items-center gap-1">
+                                {speechStatus === 'playing' && <span className="text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Playing…</span>}
+                                {speechStatus === 'paused' && <span className="text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Paused</span>}
+                                {speechStatus === 'stopped' && <span className="text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">Stopped</span>}
+                              </div>
+                              {isSpeaking && (
+                                <button
+                                  type="button"
+                                  onClick={stopSpeech}
+                                  className="text-red-500 border border-red-200 bg-red-50 px-2.5 py-0.5 rounded-full hover:bg-red-100 cursor-pointer"
+                                >
+                                  Stop Voice
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         )}
-                      </div>
+                      </React.Fragment>
                     );
                   })}
                 </div>
