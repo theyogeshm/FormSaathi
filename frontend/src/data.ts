@@ -21,13 +21,6 @@ export const BANKS: Bank[] = [
 
 export const DEMO_DOCUMENTS: DemoDocument[] = [
   {
-    id: 'blank_sbi_da1',
-    name: 'SBI Nomination Form (DA-1)',
-    type: 'form',
-    image: '📝',
-    fields: {},
-  },
-  {
     id: 'blank_sbi_savings',
     name: 'Blank SBI Savings Form',
     type: 'form',
@@ -44,26 +37,6 @@ export const DEMO_DOCUMENTS: DemoDocument[] = [
 ];
 
 export const FORM_TEMPLATES: FormTemplate[] = [
-  {
-    id: 'sbi_da1',
-    title: 'SBI Nomination Form (Form DA-1)',
-    bankName: 'State Bank of India',
-    fields: [
-      { id: 'fullName', label: 'Depositor Name(s) & Address(es)', value: '', placeholder: 'Name(s) and address(es) of depositor(s)', type: 'text', confidence: 0 },
-      { id: 'branchName', label: 'Branch Name', value: '', placeholder: 'Name and address of branch/office where deposit is held', type: 'text', confidence: 0 },
-      { id: 'depositNature', label: 'Nature of Deposit', value: '', placeholder: 'e.g., Savings Bank / Current / Fixed Deposit', type: 'text', confidence: 0 },
-      { id: 'depositDistNo', label: 'Distinguishing Number', value: '', placeholder: 'e.g., Account Number / Receipt Number', type: 'text', confidence: 0 },
-      { id: 'depositDetails', label: 'Additional Details (If any)', value: '', placeholder: 'e.g., FD duration, interest payout', type: 'text', confidence: 0 },
-      { id: 'nomineeName', label: 'Nominee Name', value: '', placeholder: 'Name of nominee', type: 'text', confidence: 0 },
-      { id: 'nomineeAddress', label: 'Nominee Address & Mobile No', value: '', placeholder: 'Address and mobile number of nominee', type: 'text', confidence: 0 },
-      { id: 'nomineeRelationship', label: 'Relationship with Depositor', value: '', placeholder: 'Relationship, if any (e.g. Spouse, Son)', type: 'text', confidence: 0 },
-      { id: 'nomineeAge', label: 'Nominee Age', value: '', placeholder: 'Age of nominee', type: 'text', confidence: 0 },
-      { id: 'nomineeDob', label: 'Nominee Date of Birth (If Minor)', value: '', placeholder: 'YYYY-MM-DD', type: 'date', confidence: 0 },
-      { id: 'guardianName', label: 'Appointee Name (If Nominee is Minor)', value: '', placeholder: 'Name of person to receive deposit on behalf of minor', type: 'text', confidence: 0 },
-      { id: 'guardianAddress', label: 'Appointee Address & Age', value: '', placeholder: 'Address and age of the appointee', type: 'text', confidence: 0 },
-      { id: 'printNomineeName', label: 'Print Nominee Name on Passbook', value: '', placeholder: 'Select option', type: 'select', options: ['Yes', 'No'], confidence: 0 },
-    ],
-  },
   {
     id: 'sbi_savings',
     title: 'SBI Savings Account Opening Form (Form 1A)',
@@ -111,6 +84,26 @@ export const FORM_TEMPLATES: FormTemplate[] = [
       { id: 'phone', label: 'Mobile Number', value: '', placeholder: '10-digit number', type: 'tel', confidence: 0 },
       { id: 'address', label: 'Communication Address', value: '', placeholder: 'Full address details', type: 'text', confidence: 0 },
       { id: 'nomineeName', label: 'Nominee Name', value: '', placeholder: 'Name of nominee (Optional)', type: 'text', confidence: 0 },
+    ],
+  },
+  {
+    id: 'sbi_da1',
+    title: 'SBI Nomination Form (Form DA-1)',
+    bankName: 'State Bank of India',
+    fields: [
+      { id: 'fullName', label: 'Depositor Name(s) & Address(es)', value: '', placeholder: 'Name(s) and address(es) of depositor(s)', type: 'text', confidence: 0 },
+      { id: 'branchName', label: 'Branch Name', value: '', placeholder: 'Name and address of branch/office where deposit is held', type: 'text', confidence: 0 },
+      { id: 'depositNature', label: 'Nature of Deposit', value: '', placeholder: 'e.g., Savings Bank / Current / Fixed Deposit', type: 'text', confidence: 0 },
+      { id: 'depositDistNo', label: 'Distinguishing Number', value: '', placeholder: 'e.g., Account Number / Receipt Number', type: 'text', confidence: 0 },
+      { id: 'depositDetails', label: 'Additional Details (If any)', value: '', placeholder: 'e.g., FD duration, interest payout', type: 'text', confidence: 0 },
+      { id: 'nomineeName', label: 'Nominee Name', value: '', placeholder: 'Name of nominee', type: 'text', confidence: 0 },
+      { id: 'nomineeAddress', label: 'Nominee Address & Mobile No', value: '', placeholder: 'Address and mobile number of nominee', type: 'text', confidence: 0 },
+      { id: 'nomineeRelationship', label: 'Relationship with Depositor', value: '', placeholder: 'Relationship, if any (e.g. Spouse, Son)', type: 'text', confidence: 0 },
+      { id: 'nomineeAge', label: 'Nominee Age', value: '', placeholder: 'Age of nominee', type: 'text', confidence: 0 },
+      { id: 'nomineeDob', label: 'Nominee Date of Birth (If Minor)', value: '', placeholder: 'YYYY-MM-DD', type: 'date', confidence: 0 },
+      { id: 'guardianName', label: 'Appointee Name (If Nominee is Minor)', value: '', placeholder: 'Name of person to receive deposit on behalf of minor', type: 'text', confidence: 0 },
+      { id: 'guardianAddress', label: 'Appointee Address & Age', value: '', placeholder: 'Address and age of the appointee', type: 'text', confidence: 0 },
+      { id: 'printNomineeName', label: 'Print Nominee Name on Passbook', value: '', placeholder: 'Select option', type: 'select', options: ['Yes', 'No'], confidence: 0 },
     ],
   },
 ];

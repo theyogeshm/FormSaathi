@@ -457,15 +457,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
 
         // Check for nominee reminder flow or success message
         if (activeTab === 'photo') {
-          if (!currentUser.nominee_name) {
-            // Trigger the existing nominee reminder flow
-            setTimeout(() => {
-              setActiveTab('voice');
-              handleStartVoiceSim(currentUser);
-            }, 1500);
-          } else {
-            setAutofillStatusMessage('Auto-filled successfully ✓');
-          }
+          setAutofillStatusMessage('Auto-filled successfully ✓');
         }
       }
     }, 350);
@@ -531,8 +523,10 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
 
   // Filter templates based on query
   const filteredTemplates = FORM_TEMPLATES.filter(t => 
-    t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    t.bankName.toLowerCase().includes(searchQuery.toLowerCase())
+    t.id !== 'sbi_da1' && (
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      t.bankName.toLowerCase().includes(searchQuery.toLowerCase())
+    )
   );
 
   // Translate field label based on language selection
@@ -653,15 +647,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
       return { ...f, value: '', confidence: 0, mappedFrom: undefined };
     }));
 
-    // Check if nominee exists to either trigger voice simulation or success status
-    if (!currentUser.nominee_name) {
-      setTimeout(() => {
-        setActiveTab('voice');
-        handleStartVoiceSim(currentUser);
-      }, 1500);
-    } else {
-      setAutofillStatusMessage('Auto-filled successfully ✓');
-    }
+    setAutofillStatusMessage('Auto-filled successfully ✓');
   };
 
   // Check if any field is filled
@@ -688,10 +674,10 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
         </div>
 
         {/* Tab Controls */}
-        <div className="flex justify-center gap-3 mb-10 max-w-xl mx-auto bg-surface-container-low p-2 rounded-full border border-outline-variant/30">
+        <div className="flex justify-center gap-2 sm:gap-3 mb-10 max-w-xl mx-auto bg-surface-container-low p-1.5 rounded-full border border-outline-variant/30">
           <button 
             onClick={() => setActiveTab('photo')}
-            className={`flex-1 py-3 px-4 rounded-full font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${activeTab === 'photo' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
+            className={`flex-1 py-2 px-3 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'photo' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
             id="tab-photo-btn"
           >
             <Camera className="w-4 h-4" />
@@ -699,7 +685,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
           </button>
           <button 
             onClick={() => setActiveTab('voice')}
-            className={`flex-1 py-3 px-4 rounded-full font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${activeTab === 'voice' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
+            className={`flex-1 py-2 px-3 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'voice' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
             id="tab-voice-btn"
           >
             <Mic className="w-4 h-4" />
@@ -707,7 +693,7 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
           </button>
           <button 
             onClick={() => setActiveTab('search')}
-            className={`flex-1 py-3 px-4 rounded-full font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${activeTab === 'search' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
+            className={`flex-1 py-2 px-3 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'search' ? 'bg-primary text-white shadow-md' : 'text-on-surface-variant hover:text-primary'}`}
             id="tab-search-btn"
           >
             <Search className="w-4 h-4" />
@@ -953,23 +939,23 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                             </div>
                           )}
 
-                          <div className="flex gap-2 pt-2">
+                          <div className="flex gap-1.5 pt-2 flex-wrap sm:flex-nowrap">
                             {!isWalkthroughPlaying && guidedFieldIndex < formFields.length && (
                               <>
                                 <button
                                   type="button"
                                   onClick={() => startGuidedWalkthrough(selectedDoc.fields)}
-                                  className="flex-grow bg-primary text-white hover:bg-primary-container py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow hover:scale-102 transform active:scale-95 transition-all"
+                                  className="flex-grow bg-primary text-white hover:bg-primary-container py-2 px-2 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 cursor-pointer shadow hover:scale-102 transform active:scale-95 transition-all whitespace-nowrap"
                                 >
-                                  <Sparkles className="w-3.5 h-3.5" />
+                                  <Sparkles className="w-3 h-3" />
                                   Simulate Guided Fill
                                 </button>
                                 <button
                                   type="button"
                                   onClick={handleInstantAutofill}
-                                  className="bg-secondary text-white hover:bg-secondary-container py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow hover:scale-102 transform active:scale-95 transition-all"
+                                  className="bg-secondary text-white hover:bg-secondary-container py-2 px-2 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 cursor-pointer shadow hover:scale-102 transform active:scale-95 transition-all whitespace-nowrap"
                                 >
-                                  <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                                  <Sparkles className="w-3 h-3 animate-pulse" />
                                   Instant Fill
                                 </button>
                               </>
@@ -977,15 +963,15 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                             {isWalkthroughPlaying && (
                               <button
                                 onClick={() => setIsWalkthroughPlaying(false)}
-                                className="flex-1 bg-amber-500 text-white hover:bg-amber-600 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow transition-all"
+                                className="flex-grow bg-amber-500 text-white hover:bg-amber-600 py-2 px-2 rounded-xl font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 cursor-pointer shadow transition-all whitespace-nowrap"
                               >
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <RefreshCw className="w-3 h-3 animate-spin" />
                                 Pause Walkthrough
                               </button>
                             )}
                             <button
                               onClick={resetDemoState}
-                              className="bg-white text-on-surface border border-outline-variant/30 hover:bg-surface-container py-2.5 px-3.5 rounded-xl font-bold text-xs cursor-pointer transition-colors"
+                              className="bg-white text-on-surface border border-outline-variant/30 hover:bg-surface-container py-2 px-2.5 rounded-xl font-bold text-[10px] sm:text-xs cursor-pointer transition-colors whitespace-nowrap"
                             >
                               Reset
                             </button>
@@ -1190,13 +1176,13 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
               </div>
 
               {/* Verified Badges (Always Visible) */}
-              <div className="border-t border-outline-variant/20 pt-4 flex gap-2 justify-center" id="scan-checks">
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-extrabold border transition-all ${selectedDoc || voiceStep >= 4 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30'}`}>
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+              <div className="border-t border-outline-variant/20 pt-4 flex gap-1.5 justify-center flex-wrap sm:flex-nowrap" id="scan-checks">
+                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-extrabold border transition-all whitespace-nowrap ${selectedDoc || voiceStep >= 4 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30'}`}>
+                  <CheckCircle2 className="w-3 h-3" />
                   Form Layout Mapped
                 </div>
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-extrabold border transition-all ${selectedDoc || voiceStep >= 4 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30'}`}>
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-extrabold border transition-all whitespace-nowrap ${selectedDoc || voiceStep >= 4 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30'}`}>
+                  <CheckCircle2 className="w-3 h-3" />
                   Field Formats Verified
                 </div>
               </div>
