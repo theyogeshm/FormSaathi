@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: #4e0078;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #6a1b9a;
+  --color-on-primary-container: #da9cff;
+  --color-primary-fixed-dim: #e4b5ff;
+  
+  --color-secondary: #b71656;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #ff538a;
+  --color-on-secondary-container: #5e0027;
+  
+  --color-tertiary: #3a2264;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #513a7c;
+  --color-on-tertiary-container: #c3a8f4;
+  
+  --color-surface: #fcf8ff;
+  --color-on-surface: #1a1a2e;
+  --color-surface-container: #efecff;
+  --color-surface-container-low: #f5f2ff;
+  --color-surface-container-high: #e8e5ff;
+  --color-surface-container-highest: #e2e0fc;
+  --color-on-surface-variant: #4d4351;
+  
+  --color-background: #fcf8ff;
+  --color-on-background: #1a1a2e;
+  
+  --color-outline: #7f7383;
+  --color-outline-variant: #d0c2d3;
+}
+
+@utility brand-gradient {
+  background: linear-gradient(135deg, #2D1457 0%, #C2185B 100%);
+}
+
+@utility glass-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+@utility ambient-shadow {
+  box-shadow: 0px 10px 30px rgba(26, 26, 46, 0.06);
+}
+
+@keyframes scan {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
+
+@utility scanning-laser {
+  animation: scan 3s infinite linear;
+}
+
+html {
+  scroll-behavior: smooth;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "FormSaathi",
+  "description": "FormSaathi simplifies banking by filling complex forms in 30 seconds using advanced Vision AI and local voice interfaces.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
