@@ -98,6 +98,10 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
   // Active User record from CSV
   const [activeUserRecord, setActiveUserRecord] = useState<Record<string, string> | null>(null);
 
+  // TTS Voice Assistance state
+  const [activeSpeechId, setActiveSpeechId] = useState<string | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+
   // Autofill status message for demo feedback
   const [autofillStatusMessage, setAutofillStatusMessage] = useState<string>('');
 
@@ -127,6 +131,48 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     setFormFields(cleared);
   };
 
+  // Language code mapping for Web Speech API
+  const getLangCode = (lang: string): string => {
+    const map: Record<string, string> = {
+      en: 'en-IN',
+      hinglish: 'hi-IN',
+      hi: 'hi-IN',
+      ta: 'ta-IN',
+      bn: 'bn-IN',
+      mr: 'mr-IN',
+      te: 'te-IN',
+    };
+    return map[lang] || 'en-IN';
+  };
+
+  // Speak text using Web Speech API
+  const speakText = (text: string, speechId: string, lang?: string) => {
+    if (!('speechSynthesis' in window)) return;
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+    // If same button clicked while playing → toggle off
+    if (activeSpeechId === speechId && isSpeaking) {
+      setActiveSpeechId(null);
+      setIsSpeaking(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang || getLangCode(currentLang);
+    utterance.rate = 0.92;
+    utterance.pitch = 1;
+    utterance.onstart = () => { setActiveSpeechId(speechId); setIsSpeaking(true); };
+    utterance.onend = () => { setActiveSpeechId(null); setIsSpeaking(false); };
+    utterance.onerror = () => { setActiveSpeechId(null); setIsSpeaking(false); };
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Stop all speech
+  const stopSpeech = () => {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    setActiveSpeechId(null);
+    setIsSpeaking(false);
+  };
+
   // Field focus handler
   const handleFieldFocus = (fieldId: string) => {
     const index = formFields.findIndex(f => f.id === fieldId);
@@ -135,101 +181,110 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     }
   };
 
-  // Get guidance details for a field
-  const getFieldGuidance = (fieldId: string) => {
-    switch (fieldId) {
-      case 'fullName':
-        return {
-          tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.',
-          regional: 'कृपया अपना पूरा कानूनी नाम दर्ज करें जैसा कि आपके बैंक रिकॉर्ड में है। शुरुआती अक्षरों (initials) का उपयोग न करें।',
-          reason: 'Required to match regulatory databases for KYC compliance checks.'
-        };
-      case 'fatherName':
-        return {
-          tip: 'Provide the full name of your father or spouse. Write legal names only.',
-          regional: 'अपने पिता या जीवनसाथी का पूरा नाम दर्ज करें। केवल कानूनी नाम ही लिखें।',
-          reason: 'Used for identity verification and unique profile documentation.'
-        };
-      case 'dob':
-        return {
-          tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.',
-          regional: 'अपनी जन्म तिथि YYYY-MM-DD प्रारूप (जैसे, 1985-04-12) में दर्ज करें। यह आपके आईडी प्रूफ से मेल खानी चाहिए।',
-          reason: 'Needed to check age limits and fulfill banking registration policies.'
-        };
-      case 'gender':
-        return {
-          tip: 'Select your legal gender from the dropdown menu options.',
-          regional: 'ड्रॉपडाउन मेनू से अपना कानूनी लिंग चुनें।',
-          reason: 'Important demographical parameter required by regulatory frameworks.'
-        };
-      case 'panNo':
-        return {
-          tip: 'Enter your 10-character alphanumeric Permanent Account Number (PAN) (e.g. APXPK9281M).',
-          regional: 'अपना 10-अक्षर का अल्फ़ान्यूमेरिक पैन नंबर (PAN) दर्ज करें (जैसे, APXPK9281M)।',
-          reason: 'Mandatory under tax regulations for transactions and account openings.'
-        };
-      case 'aadhaarNo':
-        return {
-          tip: 'Enter your 12-digit Aadhaar number (e.g., 3847 2910 4820). Your physical card remains with you.',
-          regional: 'अपना 12-अंकों का आधार नंबर दर्ज करें (जैसे, 3847 2910 4820)। आपका भौतिक कार्ड आपके पास ही सुरक्षित है।',
-          reason: 'Used for statutory e-KYC validation. No documents are uploaded.'
-        };
-      case 'phone':
-        return {
-          tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.',
-          regional: 'अपने बैंक खाते और आधार से लिंक सक्रिय 10-अंकीय मोबाइल नंबर दर्ज करें।',
-          reason: 'Required for OTP validations, alerts, and transactional communications.'
-        };
-      case 'address':
-        return {
-          tip: 'Enter your complete residential address including flat number, building, street, and locality.',
-          regional: 'फ्लैट नंबर, बिल्डिंग, गली और इलाके सहित अपना पूरा आवासीय पता दर्ज करें।',
-          reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.'
-        };
-      case 'pincode':
-        return {
-          tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.',
-          regional: 'अपने आवासीय पते के अनुसार 6-अंकों का पोस्टल कोड (पिनकोड) दर्ज करें।',
-          reason: 'Verifies geographic jurisdiction and helps in sorting logistics.'
-        };
-      case 'accountType':
-        return {
-          tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.',
-          regional: 'वह खाता प्रकार चुनें जिसे आप खोल रहे हैं: बचत (Savings), चालू (Current), या वेतन (Salary) खाता।',
-          reason: 'Determines the minimum balance requirements and interest rates.'
-        };
-      case 'monthlyIncome':
-        return {
-          tip: 'Enter your net monthly salary/income in Indian Rupees (INR). Do not include decimals.',
-          regional: 'भारतीय रुपये (INR) में अपनी शुद्ध मासिक आय दर्ज करें। दशमलव शामिल न करें।',
-          reason: 'Evaluates repayment capacity and loan eligibility limits.'
-        };
-      case 'employerName':
-        return {
-          tip: 'Enter the official registered name of your current employer (e.g., TCS Limited).',
-          regional: 'अपने वर्तमान नियोक्ता का आधिकारिक पंजीकृत नाम दर्ज करें (जैसे, TCS Limited)।',
-          reason: 'Used to cross-validate employment status and source of income.'
-        };
-      case 'loanAmount':
-        return {
-          tip: 'Enter the total loan amount you wish to borrow from the bank in Rupees.',
-          regional: 'वह कुल ऋण राशि दर्ज करें जिसे आप बैंक से उधार लेना चाहते हैं।',
-          reason: 'Basis for loan terms, EMI calculations, and credit approvals.'
-        };
-      case 'nomineeName':
-        return {
-          tip: 'Enter the full name of the person you want to nominate for this account.',
-          regional: 'उस व्यक्ति का पूरा नाम दर्ज करें जिसे आप इस खाते के लिए नामांकित करना चाहते हैं।',
-          reason: 'Required to ensure hassle-free transfer of funds to your legal heir/nominee in the future.'
-        };
-      default:
-        return {
-          tip: 'Provide the requested details accurately. Double-check for typing errors.',
-          regional: 'अनुरोधित विवरण सटीक रूप से दर्ज करें। वर्तनी या टाइपिंग त्रुटियों की जांच करें।',
-          reason: 'Ensures accurate database recording and prevents rejection.'
-        };
+  // Multilingual guidance text per field
+  const getFieldGuidanceAll = (fieldId: string): Record<string, { tip: string; regional: string; reason: string }> => {
+    const db: Record<string, Record<string, { tip: string; regional: string; reason: string }>> = {
+      fullName: {
+        en: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'Enter your complete name exactly as written in your Aadhaar or PAN card.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
+        hinglish: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'Apna pura naam likhein jaise Aadhaar ya PAN card mein likha hai. Initials mat use karein.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
+        hi: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'कृपया अपना पूरा कानूनी नाम दर्ज करें जैसा कि आपके आधार या पैन कार्ड में है। शुरुआती अक्षरों का उपयोग न करें।', reason: 'Required to match regulatory databases for KYC compliance checks.' },
+        ta: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'உங்கள் ஆதார் அல்லது பான் கார்டில் உள்ளபடி முழு பெயரை உள்ளிடவும். சுருக்கெழுத்துகளை பயன்படுத்தாதீர்கள்.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
+        bn: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'আপনার আধার বা প্যান কার্ডে যেমন আছে ঠিক তেমন পুরো নাম লিখুন। সংক্ষিপ্ত অক্ষর ব্যবহার করবেন না।', reason: 'Required to match regulatory databases for KYC compliance checks.' },
+        mr: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'आधार किंवा पॅन कार्डवर जसे आहे तसे पूर्ण नाव लिहा. शॉर्टफॉर्म वापरू नका.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
+        te: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'మీ ఆధార్ లేదా పాన్ కార్డులో ఉన్న పూర్తి పేరు నమోదు చేయండి. సంక్షిప్తాలు వాడవద్దు.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
+      },
+      fatherName: {
+        en: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'Write the full name of your father or husband/wife as on government documents.', reason: 'Used for identity verification and unique profile documentation.' },
+        hinglish: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'Apne pita ya spouse ka pura naam likhein jaise government documents mein hai.', reason: 'Used for identity verification and unique profile documentation.' },
+        hi: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'अपने पिता या जीवनसाथी का पूरा नाम दर्ज करें जैसा सरकारी दस्तावेज़ में है।', reason: 'Used for identity verification and unique profile documentation.' },
+        ta: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'உங்கள் தந்தை அல்லது துணைவியின் முழு பெயரை அரசாங்க ஆவணங்களில் உள்ளவாறு எழுதவும்.', reason: 'Used for identity verification and unique profile documentation.' },
+        bn: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'আপনার বাবা বা স্বামী/স্ত্রীর পুরো নাম সরকারি নথি অনুযায়ী লিখুন।', reason: 'Used for identity verification and unique profile documentation.' },
+        mr: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'वडिलांचे किंवा पती/पत्नीचे सरकारी कागदपत्रांवरील पूर्ण नाव लिहा.', reason: 'Used for identity verification and unique profile documentation.' },
+        te: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'మీ తండ్రి లేదా జీవిత భాగస్వామి పూర్తి పేరు ప్రభుత్వ పత్రాల ప్రకారం నమోదు చేయండి.', reason: 'Used for identity verification and unique profile documentation.' },
+      },
+      dob: {
+        en: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'Write your birth date in YYYY-MM-DD format matching your Aadhaar card.', reason: 'Needed to check age limits and fulfill banking registration policies.' },
+        hinglish: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'Janam tithi YYYY-MM-DD format mein likhein, jaise Aadhaar mein hai.', reason: 'Needed to check age limits and fulfill banking registration policies.' },
+        hi: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'अपनी जन्म तिथि YYYY-MM-DD प्रारूप में दर्ज करें जैसा आधार कार्ड में है।', reason: 'Needed to check age limits and fulfill banking registration policies.' },
+        ta: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'உங்கள் பிறந்த தேதியை YYYY-MM-DD வடிவில் ஆதார் கார்டு படி உள்ளிடவும்.', reason: 'Needed to check age limits and fulfill banking registration policies.' },
+        bn: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'আপনার জন্ম তারিখ YYYY-MM-DD ফরম্যাটে আধার কার্ড অনুযায়ী লিখুন।', reason: 'Needed to check age limits and fulfill banking registration policies.' },
+        mr: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'आधार कार्डनुसार जन्म तारीख YYYY-MM-DD स्वरूपात लिहा.', reason: 'Needed to check age limits and fulfill banking registration policies.' },
+        te: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'మీ ఆధార్ కార్డు ప్రకారం పుట్టిన తేదీని YYYY-MM-DD ఆకారంలో నమోదు చేయండి.', reason: 'Needed to check age limits and fulfill banking registration policies.' },
+      },
+      gender: {
+        en: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'Select the gender that matches your official identity documents.', reason: 'Important demographical parameter required by regulatory frameworks.' },
+        hinglish: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'Dropdown se apna gender select karein jo aapke official documents mein hai.', reason: 'Important demographical parameter required by regulatory frameworks.' },
+        hi: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'ड्रॉपडाउन से अपना लिंग चुनें जो आपके सरकारी दस्तावेज़ में है।', reason: 'Important demographical parameter required by regulatory frameworks.' },
+        ta: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'உங்கள் அரசாங்க ஆவணங்களுடன் பொருந்தும் பாலினத்தை தேர்ந்தெடுக்கவும்.', reason: 'Important demographical parameter required by regulatory frameworks.' },
+        bn: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'আপনার সরকারি পরিচয়পত্র অনুযায়ী লিঙ্গ নির্বাচন করুন।', reason: 'Important demographical parameter required by regulatory frameworks.' },
+        mr: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'सरकारी कागदपत्रांशी जुळणारे लिंग निवडा.', reason: 'Important demographical parameter required by regulatory frameworks.' },
+        te: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'మీ అధికారిక పత్రాలకు సరిపోయే లింగాన్ని ఎంచుకోండి.', reason: 'Important demographical parameter required by regulatory frameworks.' },
+      },
+      phone: {
+        en: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'Enter the mobile number linked to your Aadhaar and bank account.', reason: 'Required for OTP validations, alerts, and transactional communications.' },
+        hinglish: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'Apna 10-digit mobile number daalen jo Aadhaar aur bank account se linked hai.', reason: 'Required for OTP validations, alerts, and transactional communications.' },
+        hi: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'अपने बैंक और आधार से जुड़ा 10-अंकीय मोबाइल नंबर दर्ज करें।', reason: 'Required for OTP validations, alerts, and transactional communications.' },
+        ta: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'ஆதார் மற்றும் வங்கிக் கணக்குடன் இணைக்கப்பட்ட 10 இலக்க மொபைல் எண்ணை உள்ளிடவும்.', reason: 'Required for OTP validations, alerts, and transactional communications.' },
+        bn: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'আধার ও ব্যাংক অ্যাকাউন্টের সাথে যুক্ত ১০ সংখ্যার মোবাইল নম্বর লিখুন।', reason: 'Required for OTP validations, alerts, and transactional communications.' },
+        mr: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'आधार आणि बँक खात्याशी जोडलेला 10 अंकी मोबाईल नंबर टाका.', reason: 'Required for OTP validations, alerts, and transactional communications.' },
+        te: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'ఆధార్ మరియు బ్యాంకు ఖాతాతో అనుసంధానమైన 10 అంకెల మొబైల్ నంబర్ నమోదు చేయండి.', reason: 'Required for OTP validations, alerts, and transactional communications.' },
+      },
+      address: {
+        en: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'Write your full home address as it appears on your Aadhaar card.', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
+        hinglish: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'Apna pura ghar ka address likhein jaise Aadhaar mein hai — flat number, building, gali, sheher.', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
+        hi: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'फ्लैट नंबर, इमारत, गली और इलाके सहित अपना पूरा आवासीय पता दर्ज करें।', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
+        ta: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'ஃப்ளாட் எண், கட்டிடம், தெரு மற்றும் பகுதி உட்பட உங்கள் முழு முகவரியை உள்ளிடவும்.', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
+        bn: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'ফ্ল্যাট নম্বর, ভবন, রাস্তা এবং এলাকা সহ আপনার সম্পূর্ণ বাড়ির ঠিকানা লিখুন।', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
+        mr: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'फ्लॅट नंबर, इमारत, रस्ता आणि परिसरासह संपूर्ण राहणीचा पत्ता लिहा.', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
+        te: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'ఫ్లాట్ నంబర్, భవనం, వీధి మరియు ప్రాంతంతో పూర్తి నివాస చిరునామా నమోదు చేయండి.', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
+      },
+      pincode: {
+        en: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'Enter the 6-digit PIN code for your area as in your Aadhaar.', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
+        hinglish: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'Apne area ka 6-digit PIN code daalen jaise Aadhaar mein hai.', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
+        hi: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'अपने क्षेत्र का 6-अंकीय पिनकोड दर्ज करें जैसा आधार में है।', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
+        ta: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'உங்கள் ஆதார் கார்டில் உள்ள 6 இலக்க பின் குறியீட்டை உள்ளிடவும்.', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
+        bn: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'আপনার আধার কার্ডে থাকা ৬ সংখ্যার পিনকোড লিখুন।', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
+        mr: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'आधार कार्डवर असलेला 6 अंकी पिनकोड टाका.', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
+        te: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'మీ ఆధార్ కార్డులో ఉన్న 6 అంకెల పిన్ కోడ్ నమోదు చేయండి.', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
+      },
+      accountType: {
+        en: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'Select what type of bank account you want to open.', reason: 'Determines the minimum balance requirements and interest rates.' },
+        hinglish: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'Select karein ki aap kaun sa account kholna chahte hain — Savings, Current ya Salary.', reason: 'Determines the minimum balance requirements and interest rates.' },
+        hi: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'चुनें कि आप कौन सा खाता खोलना चाहते हैं — बचत, चालू या वेतन खाता।', reason: 'Determines the minimum balance requirements and interest rates.' },
+        ta: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'நீங்கள் திறக்க விரும்பும் கணக்கு வகையை தேர்ந்தெடுக்கவும் — சேமிப்பு, நடப்பு அல்லது சம்பளம்.', reason: 'Determines the minimum balance requirements and interest rates.' },
+        bn: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'আপনি কোন ধরনের অ্যাকাউন্ট খুলতে চান তা নির্বাচন করুন — সেভিংস, কারেন্ট বা স্যালারি।', reason: 'Determines the minimum balance requirements and interest rates.' },
+        mr: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'तुम्हाला कोणते खाते उघडायचे आहे ते निवडा — बचत, चालू किंवा पगार.', reason: 'Determines the minimum balance requirements and interest rates.' },
+        te: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'మీరు ఏ ఖాతా తెరవాలని ఉందో ఎంచుకోండి — పొదుపు, కరెంట్ లేదా జీతం ఖాతా.', reason: 'Determines the minimum balance requirements and interest rates.' },
+      },
+      nomineeName: {
+        en: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'Write the complete name of the person who will receive your account funds if something happens to you.', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
+        hinglish: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'Us insaan ka pura naam likhein jise aap apne account ka nominee banana chahte hain.', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
+        hi: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'उस व्यक्ति का पूरा नाम दर्ज करें जिसे आप इस खाते के लिए नॉमिनी बनाना चाहते हैं।', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
+        ta: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'நீங்கள் நியமிக்க விரும்பும் நபரின் முழு பெயரை உள்ளிடவும்.', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
+        bn: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'আপনি যাকে নমিনি করতে চান তার পুরো নাম লিখুন।', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
+        mr: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'तुम्हाला ज्याला नॉमिनी करायचे आहे त्याचे पूर्ण नाव लिहा.', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
+        te: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'మీరు నామినీగా నియమించాలనుకుంటున్న వ్యక్తి పూర్తి పేరు నమోదు చేయండి.', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
+      },
+    };
+    const langData = db[fieldId]?.[currentLang] || db[fieldId]?.['en'];
+    const enData = db[fieldId]?.['en'];
+    if (langData && enData) {
+      return { tip: enData.tip, regional: langData.regional, reason: enData.reason };
     }
+    const fallback = { tip: 'Provide the requested details accurately. Double-check for typing errors.', regional: '', reason: 'Ensures accurate database recording and prevents rejection.' };
+    if (currentLang === 'hi') fallback.regional = 'अनुरोधित विवरण सटीक रूप से दर्ज करें।';
+    else if (currentLang === 'hinglish') fallback.regional = 'Maangi gayi jaankari sahi se bhare.  Typing mistakes check karein.';
+    else if (currentLang === 'ta') fallback.regional = 'கோரப்பட்ட விவரங்களை சரியாக வழங்கவும்.';
+    else if (currentLang === 'bn') fallback.regional = 'অনুরোধিত বিবরণ সঠিকভাবে প্রদান করুন।';
+    else if (currentLang === 'mr') fallback.regional = 'विनंती केलेले तपशील अचूकपणे भरा.';
+    else if (currentLang === 'te') fallback.regional = 'అభ్యర్థించిన వివరాలు ఖచ్చితంగా నమోదు చేయండి.';
+    else fallback.regional = 'Enter the requested details carefully.';
+    return fallback;
   };
+
+  // Get guidance for current field (uses multilingual data)
+  const getFieldGuidance = (fieldId: string) => getFieldGuidanceAll(fieldId);
+
 
   // Start guided fill simulation
   const startGuidedWalkthrough = (presetFields: Record<string, string>) => {
