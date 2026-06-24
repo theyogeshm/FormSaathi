@@ -182,7 +182,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
   };
 
   // Multilingual guidance text per field
-  const getFieldGuidanceAll = (fieldId: string): Record<string, { tip: string; regional: string; reason: string }> => {
+  const getFieldGuidanceAll = (fieldId: string): { tip: string; regional: string; reason: string } => {
     const db: Record<string, Record<string, { tip: string; regional: string; reason: string }>> = {
       fullName: {
         en: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'Enter your complete name exactly as written in your Aadhaar or PAN card.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
@@ -283,7 +283,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
   };
 
   // Get guidance for current field (uses multilingual data)
-  const getFieldGuidance = (fieldId: string) => getFieldGuidanceAll(fieldId);
+  const getFieldGuidance = (fieldId: string): { tip: string; regional: string; reason: string } => getFieldGuidanceAll(fieldId);
 
 
   // Start guided fill simulation
