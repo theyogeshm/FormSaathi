@@ -1240,22 +1240,22 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
                     </span>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={handleInstantAutofill}
-                      className="w-full sm:w-auto px-5 py-3 rounded-full font-bold text-sm bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-full font-bold text-xs whitespace-nowrap bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Sparkles className="w-4 h-4 text-secondary animate-pulse" />
+                      <Sparkles className="w-3.5 h-3.5 text-secondary animate-pulse" />
                       Auto-fill Form
                     </button>
 
                     <button
                       type="submit"
                       disabled={!isAnyFieldFilled}
-                      className={`w-full sm:w-auto px-6 py-3 rounded-full font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${isAnyFieldFilled ? 'bg-secondary text-white hover:bg-secondary-container hover:shadow-lg hover:scale-102' : 'bg-surface-container-highest text-on-surface-variant/40 cursor-not-allowed border'}`}
+                      className={`w-full sm:w-auto px-4 py-2.5 rounded-full font-bold text-xs whitespace-nowrap shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${isAnyFieldFilled ? 'bg-secondary text-white hover:bg-secondary-container hover:shadow-lg hover:scale-102' : 'bg-surface-container-highest text-on-surface-variant/40 cursor-not-allowed border'}`}
                     >
-                      <Download className="w-4 h-4" />
+                      <Download className="w-3.5 h-3.5" />
                       Download Form & QR Code
                     </button>
                   </div>
