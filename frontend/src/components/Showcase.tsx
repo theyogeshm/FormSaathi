@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Mic, Search, CheckCircle2, Upload, FileText, Download, QrCode, Sparkles, RefreshCw, AlertCircle, Printer } from 'lucide-react';
+import { Camera, Mic, Search, CheckCircle2, Upload, FileText, Download, QrCode, Sparkles, RefreshCw, AlertCircle, Printer, Volume2, VolumeX } from 'lucide-react';
 import { ShowcaseTab, DemoDocument, FormTemplate, FormField } from '../types';
 import { DEMO_DOCUMENTS, FORM_TEMPLATES, LANGUAGES } from '../data';
 import { t } from '../translations';
@@ -892,26 +892,66 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                                   </div>
 
                                   <div className="space-y-2 pt-2 border-t border-outline-variant/10 text-xs">
+
+                                    {/* English Tip */}
                                     <div className="space-y-1">
-                                      <span className="text-[9px] font-bold text-secondary uppercase block">{t('sh_guide_tip_label', currentLang)}</span>
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[9px] font-bold text-secondary uppercase">{t('sh_guide_tip_label', currentLang)}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => speakText(info.tip, `tip-${currentField.id}`, 'en-IN')}
+                                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer shadow-sm ${activeSpeechId === `tip-${currentField.id}` && isSpeaking ? 'bg-secondary text-white border-secondary animate-pulse' : 'bg-white text-secondary border-secondary/50 hover:bg-secondary hover:text-white'}`}
+                                        >
+                                          {activeSpeechId === `tip-${currentField.id}` && isSpeaking
+                                            ? <><VolumeX className="w-3 h-3" /> Stop</>
+                                            : <><Volume2 className="w-3 h-3" /> EN</>}
+                                        </button>
+                                      </div>
                                       <p className="text-on-surface leading-relaxed font-medium bg-white p-2.5 rounded-lg border border-outline-variant/20">
                                         {info.tip}
                                       </p>
                                     </div>
-                                    
-                                    <div className="space-y-1 pt-1">
-                                      <span className="text-[9px] font-bold text-primary uppercase block">{t('sh_guide_reg_label', currentLang)}</span>
-                                      <p className="text-on-surface-variant leading-relaxed font-semibold italic bg-white p-2.5 rounded-lg border border-outline-variant/20">
-                                        {info.regional}
-                                      </p>
-                                    </div>
 
+                                    {/* Regional */}
+                                    {info.regional && (
+                                      <div className="space-y-1 pt-1">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-[9px] font-bold text-primary uppercase">{t('sh_guide_reg_label', currentLang)}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => speakText(info.regional, `reg-${currentField.id}`)}
+                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer shadow-sm ${activeSpeechId === `reg-${currentField.id}` && isSpeaking ? 'bg-primary text-white border-primary animate-pulse' : 'bg-white text-primary border-primary/50 hover:bg-primary hover:text-white'}`}
+                                          >
+                                            {activeSpeechId === `reg-${currentField.id}` && isSpeaking
+                                            ? <><VolumeX className="w-3 h-3" /> Stop</>
+                                            : <><Volume2 className="w-3 h-3" /> {currentLang === 'hinglish' ? 'HI' : currentLang.toUpperCase()}</>}
+                                          </button>
+                                        </div>
+                                        <p className="text-on-surface-variant leading-relaxed font-semibold italic bg-white p-2.5 rounded-lg border border-outline-variant/20">
+                                          {info.regional}
+                                        </p>
+                                      </div>
+                                    )}
+
+                                    {/* Why */}
                                     <div className="space-y-1 pt-1 animate-fade-in">
-                                      <span className="text-[9px] font-bold text-on-surface-variant uppercase block">{t('sh_guide_why_label', currentLang)}</span>
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[9px] font-bold text-on-surface-variant uppercase">{t('sh_guide_why_label', currentLang)}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => speakText(info.reason, `why-${currentField.id}`, 'en-IN')}
+                                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer shadow-sm ${activeSpeechId === `why-${currentField.id}` && isSpeaking ? 'bg-on-surface-variant text-white border-on-surface-variant animate-pulse' : 'bg-white text-on-surface-variant border-outline-variant/50 hover:bg-surface-container'}`}
+                                        >
+                                          {activeSpeechId === `why-${currentField.id}` && isSpeaking
+                                            ? <><VolumeX className="w-3 h-3" /> Stop</>
+                                            : <><Volume2 className="w-3 h-3" /> Why</>}
+                                        </button>
+                                      </div>
                                       <p className="text-on-surface-variant text-[11px] leading-relaxed">
                                         {info.reason}
                                       </p>
                                     </div>
+
                                   </div>
 
                                   <div className="pt-2 flex items-center justify-between">
