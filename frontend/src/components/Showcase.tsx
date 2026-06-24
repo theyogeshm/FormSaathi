@@ -212,12 +212,18 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
     return () => window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
   }, []);
 
-  // Speak text using Web Speech API with improved quality settings
+  // Speak text using Web Speech API — Chrome-hardened implementation
   const speakText = (text: string, speechId: string, lang?: string) => {
-    if (!('speechSynthesis' in window)) return;
+    if (!('speechSynthesis' in window)) {
+      console.warn('[FormSaathi TTS] speechSynthesis not supported');
+      return;
+    }
 
     // Toggle off if the same button is clicked while already playing
     if (activeSpeechId === speechId && isSpeaking) {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
       window.speechSynthesis.cancel();
       setActiveSpeechId(null);
       setIsSpeaking(false);
@@ -226,44 +232,71 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
       return;
     }
 
-    // Cancel any ongoing speech first
+    // Hard-cancel anything currently playing
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
     window.speechSynthesis.cancel();
 
     const targetLang = lang || getLangCode(formLang);
 
-    // ⚠️ Chrome bug: calling speak() immediately after cancel() silently fails.
-    // A short delay lets the synthesis engine fully reset before the next speak().
+    // ⚠️ Chrome bugs addressed here:
+    // 1. speak() right after cancel() is silently dropped → wait 200ms
+    // 2. synthesis engine can get stuck "paused" after tab switch → call resume()
+    // 3. Assigning utterance.voice with a stale reference fails silently →
+    //    always get fresh voices list and assign fresh voice object immediately before speak()
     setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang   = targetLang;
-      utterance.rate   = 0.95;
-      utterance.pitch  = 1.0;
-      utterance.volume = 1.0;
+      // Un-stuck Chrome's paused synthesis engine
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
 
-      // Assign best available voice
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate   = 0.95; // requirement 3: rate = 0.95
+      utterance.pitch  = 1.0;  // requirement 3: pitch = 1.0
+      utterance.volume = 1.0;  // requirement 3: volume = 1.0
+
       const voice = getBestVoice(targetLang);
       if (voice) {
         utterance.voice = voice;
+        utterance.lang = voice.lang;
         setActiveVoiceLabel(`${voice.name} (${voice.lang})`);
       } else {
-        setActiveVoiceLabel('default');
+        utterance.lang = targetLang;
+        setActiveVoiceLabel(targetLang);
       }
+
+      // Chrome keep-alive: synthesis auto-pauses after ~15s of audio.
+      // A periodic resume() call prevents silent cutoff on long texts.
+      let keepAlive: ReturnType<typeof setInterval> | null = null;
 
       utterance.onstart = () => {
         setActiveSpeechId(speechId);
         setIsSpeaking(true);
         setSpeechStatus('playing');
+        // Ping resume every 10s to prevent Chrome's auto-pause
+        keepAlive = setInterval(() => {
+          if (window.speechSynthesis.speaking && window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+        }, 10000);
+        console.info(`[FormSaathi TTS] ✓ Playing with voice: ${utterance.voice?.name || 'Default'}`);
       };
       utterance.onpause  = () => { setSpeechStatus('paused'); };
       utterance.onresume = () => { setSpeechStatus('playing'); };
-      utterance.onend    = () => {
+      utterance.onend = () => {
+        if (keepAlive) clearInterval(keepAlive);
         setActiveSpeechId(null);
         setIsSpeaking(false);
         setSpeechStatus('idle');
         setActiveVoiceLabel('');
       };
       utterance.onerror = (e) => {
-        console.error('[FormSaathi TTS] Error:', e.error);
+        if (keepAlive) clearInterval(keepAlive);
+        // 'interrupted' is not a real error — it just means cancel() was called
+        if (e.error !== 'interrupted' && e.error !== 'canceled') {
+          console.error('[FormSaathi TTS] Error:', e.error);
+        }
         setActiveSpeechId(null);
         setIsSpeaking(false);
         setSpeechStatus('idle');
@@ -271,7 +304,8 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
       };
 
       window.speechSynthesis.speak(utterance);
-    }, 100); // 100ms is enough for Chrome to reset after cancel()
+      console.info(`[FormSaathi TTS] speak() called, lang=${targetLang}, speaking=${window.speechSynthesis.speaking}`);
+    }, 200);
   };
 
   // Stop all speech
@@ -295,100 +329,949 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
   const getFieldGuidanceAll = (fieldId: string): { tip: string; regional: string; reason: string } => {
     const db: Record<string, Record<string, { tip: string; regional: string; reason: string }>> = {
       fullName: {
-        en: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'Enter your complete name exactly as written in your Aadhaar or PAN card.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
-        hinglish: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'Apna pura naam likhein jaise Aadhaar ya PAN card mein likha hai. Initials mat use karein.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
-        hi: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'कृपया अपना पूरा कानूनी नाम दर्ज करें जैसा कि आपके आधार या पैन कार्ड में है। शुरुआती अक्षरों का उपयोग न करें।', reason: 'Required to match regulatory databases for KYC compliance checks.' },
-        ta: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'உங்கள் ஆதார் அல்லது பான் கார்டில் உள்ளபடி முழு பெயரை உள்ளிடவும். சுருக்கெழுத்துகளை பயன்படுத்தாதீர்கள்.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
-        bn: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'আপনার আধার বা প্যান কার্ডে যেমন আছে ঠিক তেমন পুরো নাম লিখুন। সংক্ষিপ্ত অক্ষর ব্যবহার করবেন না।', reason: 'Required to match regulatory databases for KYC compliance checks.' },
-        mr: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'आधार किंवा पॅन कार्डवर जसे आहे तसे पूर्ण नाव लिहा. शॉर्टफॉर्म वापरू नका.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
-        te: { tip: 'Enter your full legal name as it appears on your official bank records. Do not use initials.', regional: 'మీ ఆధార్ లేదా పాన్ కార్డులో ఉన్న పూర్తి పేరు నమోదు చేయండి. సంక్షిప్తాలు వాడవద్దు.', reason: 'Required to match regulatory databases for KYC compliance checks.' },
+        en: {
+          tip: "Enter your full legal name as it appears on your official documents like Aadhaar or PAN card.",
+          regional: "Please write your full name exactly as it is spelled on your identity proof, without any short forms.",
+          reason: "This ensures that your bank account is registered under your correct legal identity to prevent identity mismatch."
+        },
+        hinglish: {
+          tip: "Enter your full legal name as it appears on your official documents like Aadhaar or PAN card.",
+          regional: "Apna poora naam likhein jo aapke Aadhaar ya PAN card par hai, bina kisi short form ke.",
+          reason: "Isse aapka bank account aapki sahi legal identity ke under register hota hai aur mismatch nahi hota."
+        },
+        hi: {
+          tip: "Enter your full legal name as it appears on your official documents like Aadhaar or PAN card.",
+          regional: "अपना पूरा नाम लिखें जो आपके आधार या पैन कार्ड पर है, बिना किसी शॉर्ट फॉर्म के।",
+          reason: "यह सुनिश्चित करता है कि आपका बैंक खाता आपकी सही कानूनी पहचान के तहत पंजीकृत हो ताकि नाम में भिन्नता न हो।"
+        },
+        ta: {
+          tip: "Enter your full legal name as it appears on your official documents like Aadhaar or PAN card.",
+          regional: "உங்கள் ஆதார் அல்லது பான் கார்டில் உள்ளவாறு உங்கள் முழு பெயரை எழுதவும், சுருக்கெழுத்துக்களை தவிர்க்கவும்.",
+          reason: "இது அடையாளப் பிழைகளைத் தவிர்க்க உங்கள் வங்கிக் கணக்கு சரியான சட்டப்பூர்வ பெயரில் பதிவு செய்யப்படுவதை உறுதி செய்கிறது."
+        },
+        bn: {
+          tip: "Enter your full legal name as it appears on your official documents like Aadhaar or PAN card.",
+          regional: "আপনার আধার বা প্যান কার্ডে যেভাবে বানান আছে ঠিক সেভাবে আপনার পুরো নাম লিখুন, কোনো সংক্ষিপ্ত রূপ ব্যবহার করবেন না।",
+          reason: "এটি নিশ্চিত করে যে আপনার ব্যাঙ্ক অ্যাকাউন্টটি আপনার সঠিক আইনি পরিচয়ের অধীনে নিবন্ধিত রয়েছে যাতে পরবর্তীতে কোনো অমিল না হয়।"
+        },
+        mr: {
+          tip: "Enter your full legal name as it appears on your official documents like Aadhaar or PAN card.",
+          regional: "तुमचे पूर्ण नाव तुमच्या आधार किंवा पॅन कार्डवर जसे आहे तसेच लिहा, कोणतीही लघुरूपे वापरू नका.",
+          reason: "हे तुमचे बँक खाते तुमच्या योग्य कायदेशीर नावाखाली नोंदणीकृत असल्याची खात्री करते जेणेकरून नावातील तफावत टळेल."
+        },
+        te: {
+          tip: "Enter your full legal name as it appears on your official documents like Aadhaar or PAN card.",
+          regional: "మీ ఆధార్ లేదా పాన్ కార్డులో ఉన్నట్లుగా మీ పూర్తి పేరును రాయండి, సంక్షిప్త రూపాలను ఉపయోగించవద్దు.",
+          reason: "ఇది మీ బ్యాంక్ ఖాతా మీ సరైన చట్టపరమైన గుర్తింపు క్రింద నమోదు చేయబడిందని నిర్ధారిస్తుంది, తద్వారా గుర్తింపు సరిపోలని సమస్యలు రావు."
+        }
       },
       fatherName: {
-        en: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'Write the full name of your father or husband/wife as on government documents.', reason: 'Used for identity verification and unique profile documentation.' },
-        hinglish: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'Apne pita ya spouse ka pura naam likhein jaise government documents mein hai.', reason: 'Used for identity verification and unique profile documentation.' },
-        hi: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'अपने पिता या जीवनसाथी का पूरा नाम दर्ज करें जैसा सरकारी दस्तावेज़ में है।', reason: 'Used for identity verification and unique profile documentation.' },
-        ta: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'உங்கள் தந்தை அல்லது துணைவியின் முழு பெயரை அரசாங்க ஆவணங்களில் உள்ளவாறு எழுதவும்.', reason: 'Used for identity verification and unique profile documentation.' },
-        bn: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'আপনার বাবা বা স্বামী/স্ত্রীর পুরো নাম সরকারি নথি অনুযায়ী লিখুন।', reason: 'Used for identity verification and unique profile documentation.' },
-        mr: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'वडिलांचे किंवा पती/पत्नीचे सरकारी कागदपत्रांवरील पूर्ण नाव लिहा.', reason: 'Used for identity verification and unique profile documentation.' },
-        te: { tip: 'Provide the full name of your father or spouse. Write legal names only.', regional: 'మీ తండ్రి లేదా జీవిత భాగస్వామి పూర్తి పేరు ప్రభుత్వ పత్రాల ప్రకారం నమోదు చేయండి.', reason: 'Used for identity verification and unique profile documentation.' },
+        en: {
+          tip: "Provide the full name of your father or spouse as shown in government records.",
+          regional: "Enter the full name of your father or husband/wife, keeping the spelling same as on their ID proofs.",
+          reason: "Required for verifying your family linkage and distinguishing your account from others with similar names."
+        },
+        hinglish: {
+          tip: "Provide the full name of your father or spouse as shown in government records.",
+          regional: "Apne pita ya pati/patni ka poora naam likhein, jaisa unke official ID proofs par hai.",
+          reason: "Aapke family relationship ko check karne aur same naam wale accounts se alag rakhne ke liye zaruri hai."
+        },
+        hi: {
+          tip: "Provide the full name of your father or spouse as shown in government records.",
+          regional: "अपने पिता या पति/पत्नी का पूरा नाम लिखें, जैसा उनके आधिकारिक पहचान पत्र पर है।",
+          reason: "आपके पारिवारिक संबंध को सत्यापित करने और समान नाम वाले अन्य खातों से आपके खाते को अलग करने के लिए आवश्यक है।"
+        },
+        ta: {
+          tip: "Provide the full name of your father or spouse as shown in government records.",
+          regional: "உங்கள் தந்தை அல்லது கணவர்/மனைவியின் முழு பெயரை, அவர்களின் அடையாள அட்டையில் உள்ளபடி உள்ளிடவும்.",
+          reason: "உங்கள் குடும்ப உறவைச் சரிபார்க்கவும், ஒரே மாதிரியான பெயர்களைக் கொண்ட பிற கணக்குகளிலிருந்து உங்கள் கணக்கை வேறுபடுத்தவும் தேவைப்படுகிறது."
+        },
+        bn: {
+          tip: "Provide the full name of your father or spouse as shown in government records.",
+          regional: "আপনার বাবা বা স্বামী/স্ত্রীর পুরো নাম লিখুন, তাদের পরিচয়পত্রে যেভাবে আছে সেই বানানই ব্যবহার করুন।",
+          reason: "আপনার पारिवारिक পরিচয় যাচাই করতে এবং একই নামের অন্যান্য অ্যাকাউন্ট থেকে আপনার অ্যাকাউন্টকে আলাদা করতে এটি প্রয়োজনীয়।"
+        },
+        mr: {
+          tip: "Provide the full name of your father or spouse as shown in government records.",
+          regional: "तुमच्या वडिलांचे किंवा पती/पत्नीचे पूर्ण नाव लिहा, त्यांच्या ओळखपत्रावरील स्पेलिंगप्रमाणेच नोंद करा.",
+          reason: "तुमच्या कौटुंबिक संबंधांची पडताळणी करण्यासाठी आणि समान नावाच्या इतर खात्यांपासून तुमचे खाते वेगळे ठेवण्यासाठी आवश्यक आहे."
+        },
+        te: {
+          tip: "Provide the full name of your father or spouse as shown in government records.",
+          regional: "మీ తండ్రి లేదా భర్త/భార్య పూర్తి పేరును వారి గుర్తింపు కార్డులలో ఉన్న విధంగా నమోదు చేయండి.",
+          reason: "మీ కుటుంబ సంబంధాన్ని ధృవీకరించడానికి మరియు ఒకే రకమైన పేర్లు ఉన్న ఇతర ఖాతాల నుండి మీ ఖాతాను వేరు చేయడానికి ఇది అవసరం."
+        }
       },
       dob: {
-        en: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'Write your birth date in YYYY-MM-DD format matching your Aadhaar card.', reason: 'Needed to check age limits and fulfill banking registration policies.' },
-        hinglish: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'Janam tithi YYYY-MM-DD format mein likhein, jaise Aadhaar mein hai.', reason: 'Needed to check age limits and fulfill banking registration policies.' },
-        hi: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'अपनी जन्म तिथि YYYY-MM-DD प्रारूप में दर्ज करें जैसा आधार कार्ड में है।', reason: 'Needed to check age limits and fulfill banking registration policies.' },
-        ta: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'உங்கள் பிறந்த தேதியை YYYY-MM-DD வடிவில் ஆதார் கார்டு படி உள்ளிடவும்.', reason: 'Needed to check age limits and fulfill banking registration policies.' },
-        bn: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'আপনার জন্ম তারিখ YYYY-MM-DD ফরম্যাটে আধার কার্ড অনুযায়ী লিখুন।', reason: 'Needed to check age limits and fulfill banking registration policies.' },
-        mr: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'आधार कार्डनुसार जन्म तारीख YYYY-MM-DD स्वरूपात लिहा.', reason: 'Needed to check age limits and fulfill banking registration policies.' },
-        te: { tip: 'Enter your date of birth in YYYY-MM-DD format (e.g., 1985-04-12). Must match official ID proofs.', regional: 'మీ ఆధార్ కార్డు ప్రకారం పుట్టిన తేదీని YYYY-MM-DD ఆకారంలో నమోదు చేయండి.', reason: 'Needed to check age limits and fulfill banking registration policies.' },
+        en: {
+          tip: "Enter your birth date in YYYY-MM-DD format (for example, 1995-08-25).",
+          regional: "Select or enter your birth date matching the date printed on your Aadhaar card.",
+          reason: "Needed to confirm your age limits for eligibility and for security verification when you contact the bank."
+        },
+        hinglish: {
+          tip: "Enter your birth date in YYYY-MM-DD format (for example, 1995-08-25).",
+          regional: "Apni janam tithi YYYY-MM-DD format mein bhariye, jo aapke Aadhaar card se match karti ho.",
+          reason: "Aapki eligibility check karne aur jab aap bank ko contact karein tab security check karne ke liye chahiye."
+        },
+        hi: {
+          tip: "Enter your birth date in YYYY-MM-DD format (for example, 1995-08-25).",
+          regional: "अपनी जन्म तिथि YYYY-MM-DD प्रारूप में दर्ज करें, जो आपके आधार कार्ड से मेल खाती हो।",
+          reason: "योग्यता के लिए आपकी आयु सीमा की पुष्टि करने और जब आप बैंक से संपर्क करते हैं तो सुरक्षा सत्यापन के लिए आवश्यक है।"
+        },
+        ta: {
+          tip: "Enter your birth date in YYYY-MM-DD format (for example, 1995-08-25).",
+          regional: "ஆதார் கார்டில் உள்ளவாறு உங்கள் பிறந்த தேதியை YYYY-MM-DD வடிவில் உள்ளிடவும்.",
+          reason: "உங்கள் வயது தகுதியை உறுதிப்படுத்தவும், நீங்கள் வங்கியைத் தொடர்பு கொள்ளும்போது பாதுகாப்பு சரிபார்ப்புக்காகவும் இது தேவைப்படுகிறது."
+        },
+        bn: {
+          tip: "Enter your birth date in YYYY-MM-DD format (for example, 1995-08-25).",
+          regional: "আপনার আধার কার্ডের সাথে মিলিয়ে আপনার জন্ম তারিখটি YYYY-MM-DD ফরম্যাটে লিখুন।",
+          reason: "আপনার যোগ্যতার বয়সসীমা নিশ্চিত করতে এবং ব্যাঙ্কের সাথে যোগাযোগের সময় নিরাপত্তা যাচাইয়ের জন্য এটি প্রয়োজন।"
+        },
+        mr: {
+          tip: "Enter your birth date in YYYY-MM-DD format (for example, 1995-08-25).",
+          regional: "तुमची जन्मतारीख आधार कार्डवरील नोंदीप्रमाणे YYYY-MM-DD स्वरूपात भरा.",
+          reason: "पात्रतेसाठी तुमचे वय तपासण्यासाठी आणि तुम्ही बँकेशी संपर्क साधता तेव्हा सुरक्षा पडताळणीसाठी आवश्यक आहे."
+        },
+        te: {
+          tip: "Enter your birth date in YYYY-MM-DD format (for example, 1995-08-25).",
+          regional: "మీ పుట్టిన తేదీని ఆధార్ కార్డు ప్రకారం YYYY-MM-DD ఆకారంలో నమోదు చేయండి.",
+          reason: "మీ అర్హత వయస్సును నిర్ధారించడానికి మరియు మీరు బ్యాంకును సంప్రదించినప్పుడు భద్రతా ధృవీకరణ కోసం ఇది అవసరం."
+        }
       },
       gender: {
-        en: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'Select the gender that matches your official identity documents.', reason: 'Important demographical parameter required by regulatory frameworks.' },
-        hinglish: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'Dropdown se apna gender select karein jo aapke official documents mein hai.', reason: 'Important demographical parameter required by regulatory frameworks.' },
-        hi: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'ड्रॉपडाउन से अपना लिंग चुनें जो आपके सरकारी दस्तावेज़ में है।', reason: 'Important demographical parameter required by regulatory frameworks.' },
-        ta: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'உங்கள் அரசாங்க ஆவணங்களுடன் பொருந்தும் பாலினத்தை தேர்ந்தெடுக்கவும்.', reason: 'Important demographical parameter required by regulatory frameworks.' },
-        bn: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'আপনার সরকারি পরিচয়পত্র অনুযায়ী লিঙ্গ নির্বাচন করুন।', reason: 'Important demographical parameter required by regulatory frameworks.' },
-        mr: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'सरकारी कागदपत्रांशी जुळणारे लिंग निवडा.', reason: 'Important demographical parameter required by regulatory frameworks.' },
-        te: { tip: 'Select your legal gender from the dropdown menu options.', regional: 'మీ అధికారిక పత్రాలకు సరిపోయే లింగాన్ని ఎంచుకోండి.', reason: 'Important demographical parameter required by regulatory frameworks.' },
+        en: {
+          tip: "Select your gender from the list of options.",
+          regional: "Choose the gender that matches your legal identity and government documents.",
+          reason: "Required as part of demographic records and regulatory KYC verification."
+        },
+        hinglish: {
+          tip: "Select your gender from the list of options.",
+          regional: "Dropdown se apna gender choose karein jo aapke government documents se match karta hai.",
+          reason: "Aapke gender card and demographic records aur government KYC check ke liye zaruri hai."
+        },
+        hi: {
+          tip: "Select your gender from the list of options.",
+          regional: "अपना लिंग चुनें जो आपके सरकारी दस्तावेजों से मेल खाता हो।",
+          reason: "जनसांख्यिकीय रिकॉर्ड और विनियामक केवाईसी सत्यापन के हिस्से के रूप में आवश्यक।"
+        },
+        ta: {
+          tip: "Select your gender from the list of options.",
+          regional: "உங்கள் அரசு ஆவணங்களுடன் பொருந்தும் பாலினத்தை தேர்ந்தெடுக்கவும்.",
+          reason: "மக்கள்தொகை பதிவுகள் மற்றும் ஒழுங்குமுறை கேஒய்சி (KYC) சரிபார்ப்பின் ஒரு பகுதியாக தேவைப்படுகிறது."
+        },
+        bn: {
+          tip: "Select your gender from the list of options.",
+          regional: "আপনার সরকারি নথির সাথে মিলে যাওয়া লিঙ্গটি বেছে নিন।",
+          reason: "জনপরিসংখ্যানগত রেকর্ড এবং সরকারি কেওয়াইসি (KYC) যাচাইকরণের অংশ হিসেবে এটি প্রয়োজনীয়।"
+        },
+        mr: {
+          tip: "Select your gender from the list of options.",
+          regional: "तुमच्या सरकारी ओळखपत्राशी जुळणारे लिंग निवडा.",
+          reason: "लोकसंख्याशास्त्रीय नोंदी आणि नियामक केवायसी (KYC) पडताळणीचा भाग म्हणून आवश्यक आहे."
+        },
+        te: {
+          tip: "Select your gender from the list of options.",
+          regional: "మీ ప్రభుత్వ పత్రాలకు సరిపోయే లింగాన్ని ఎంచుకోండి.",
+          reason: "జనాభా రికార్డులు మరియు నియంత్రణ కేవైసీ (KYC) ధృవీకరణలో భాగంగా ఇది అవసరం."
+        }
+      },
+      panNo: {
+        en: {
+          tip: "Enter your 10-character Permanent Account Number (PAN) in uppercase.",
+          regional: "Provide your 10-digit PAN number. It contains 5 letters, 4 numbers, and 1 letter.",
+          reason: "Mandatory under Indian tax laws to monitor high-value transactions and link your account with income tax."
+        },
+        hinglish: {
+          tip: "Enter your 10-character Permanent Account Number (PAN) in uppercase.",
+          regional: "Apna 10-character ka PAN number likhein, jismein 5 letters, 4 numbers aur aakhir mein 1 letter hota hai.",
+          reason: "Tax rules ke mutabik bade transaction ko check karne aur account ko income tax se link karne ke liye compulsory hai."
+        },
+        hi: {
+          tip: "Enter your 10-character Permanent Account Number (PAN) in uppercase.",
+          regional: "अपना 10-अक्षर का पैन (PAN) नंबर दर्ज करें। इसमें 5 अक्षर, 4 अंक और अंत में 1 अक्षर होता है।",
+          reason: "भारतीय कर कानूनों के तहत बड़े लेनदेन की निगरानी करने और आपके खाते को आयकर से जोड़ने के लिए अनिवार्य है।"
+        },
+        ta: {
+          tip: "Enter your 10-character Permanent Account Number (PAN) in uppercase.",
+          regional: "உங்கள் 10 இலக்க பான் (PAN) எண்ணை உள்ளிடவும். இதில் 5 எழுத்துக்கள், 4 எண்கள் மற்றும் 1 எழுத்து இருக்கும்.",
+          reason: "உயர் மதிப்பு பரிவர்த்தனைகளைக் கண்காணிக்கவும், உங்கள் கணக்கை வருமான वரியுடன் இணைக்கவும் இந்திய வரிச் சட்டங்களின் கீழ் கட்டாயமாகும்."
+        },
+        bn: {
+          tip: "Enter your 10-character Permanent Account Number (PAN) in uppercase.",
+          regional: "আপনার ১০ সংখ্যার প্যান (PAN) নম্বরটি লিখুন। এতে ৫টি অক্ষর, ৪টি সংখ্যা এবং শেষে ১টি অক্ষর থাকে।",
+          reason: "উচ্চ-মূল্যের লেনদেনের ওপর নজর রাখতে এবং আপনার অ্যাকাউন্টটিকে আয়করের সাথে লিঙ্ক করতে ভারতীয় কর আইনের অধীনে এটি বাধ্যতামূলক।"
+        },
+        mr: {
+          tip: "Enter your 10-character Permanent Account Number (PAN) in uppercase.",
+          regional: "तुमचा 10 अंकी पॅन (PAN) नंबर नोंदवा. यामध्ये 5 अक्षरे, 4 अंक आणि शेवटी 1 अक्षर असते.",
+          reason: "उच्च मूल्याच्या व्यवहारांवर लक्ष ठेवण्यासाठी आणि तुमचे खाते आयकर विभागाशी जोडण्यासाठी भारतीय कर कायद्यानुसार हे बंधनकारक आहे."
+        },
+        te: {
+          tip: "Enter your 10-character Permanent Account Number (PAN) in uppercase.",
+          regional: "మీ 10 అంకెల పాన్ (PAN) నంబరును నమోదు చేయండి. ఇందులో 5 అక్షరాలు, 4 అంకెలు మరియు 1 అక్షరం ఉంటాయి.",
+          reason: "భారతీయ పన్ను చట్టాల ప్రకారం అధిక విలువ కలిగిన లావాదేవీలను పర్యవేక్షించడానికి మరియు మీ ఖాతాను ఆదాయపు పన్నుతో అనుసంధానించడానికి ఇది తప్పనిసరి."
+        }
+      },
+      aadhaarNo: {
+        en: {
+          tip: "Enter your 12-digit Aadhaar Card number carefully.",
+          regional: "Provide the 12-digit Aadhaar number from your card. Double-check all digits.",
+          reason: "Required for biometric identity verification and linking government subsidies directly to your account."
+        },
+        hinglish: {
+          tip: "Enter your 12-digit Aadhaar Card number carefully.",
+          regional: "Apna 12-digit ka Aadhaar number likhein. Saare digits ko dhyan se check kar lein.",
+          reason: "Biometric identity verification aur sarkari subsidy ko seedhe aapke account se jodne ke liye chahiye."
+        },
+        hi: {
+          tip: "Enter your 12-digit Aadhaar Card number carefully.",
+          regional: "अपना 12-अंकीय आधार नंबर दर्ज करें। सभी अंकों को ध्यान से जांच लें।",
+          reason: "बायोमेट्रिक पहचान सत्यापन और सरकारी सब्सिडी को सीधे आपके खाते से जोड़ने के लिए आवश्यक है।"
+        },
+        ta: {
+          tip: "Enter your 12-digit Aadhaar Card number carefully.",
+          regional: "உங்கள் கார்டில் உள்ள 12 இலக்க ஆதார் (Aadhaar) எண்ணை கவனமாக உள்ளிடவும்.",
+          reason: "பயிற்சி அடையாள சரிபார்ப்புக்கும், அரசாங்க மானியங்களை நேரடியாக உங்கள் கணக்குடன் இணைப்பதற்கும் தேவைப்படுகிறது."
+        },
+        bn: {
+          tip: "Enter your 12-digit Aadhaar Card number carefully.",
+          regional: "আপনার কার্ডে থাকা ১২ সংখ্যার আধার নম্বরটি লিখুন। সবকটি সংখ্যা ভালো করে মিলিয়ে নিন।",
+          reason: "বায়োমেট্রিক পরিচয় যাচাইকরণের জন্য এবং সরকারি ভর্তুকি সরাসরি আপনার অ্যাকাউন্টে লিঙ্ক করার জন্য এটি প্রয়োজনীয়।"
+        },
+        mr: {
+          tip: "Enter your 12-digit Aadhaar Card number carefully.",
+          regional: "तुमचा 12 अंकी आधार नंबर काळजीपूर्वक टाका. सर्व अंक पुन्हा तपासून घ्या.",
+          reason: "बायोमेट्रिक ओळख पडताळणीसाठी आणि सरकारी सबसिडी थेट तुमच्या खात्यात जमा करण्यासाठी आवश्यक आहे."
+        },
+        te: {
+          tip: "Enter your 12-digit Aadhaar Card number carefully.",
+          regional: "మీ కార్డులో ఉన్న 12 అంకెల ఆధార్ నంబరును జాగ్రత్తగా నమోదు చేయండి.",
+          reason: "బయోమెట్రిక్ గుర్తింపు ధృవీకరణ మరియు ప్రభుత్వ సబ్సిడీలను నేరుగా మీ ఖాతాకు అనుసంధానించడానికి ఇది అవసరం."
+        }
       },
       phone: {
-        en: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'Enter the mobile number linked to your Aadhaar and bank account.', reason: 'Required for OTP validations, alerts, and transactional communications.' },
-        hinglish: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'Apna 10-digit mobile number daalen jo Aadhaar aur bank account se linked hai.', reason: 'Required for OTP validations, alerts, and transactional communications.' },
-        hi: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'अपने बैंक और आधार से जुड़ा 10-अंकीय मोबाइल नंबर दर्ज करें।', reason: 'Required for OTP validations, alerts, and transactional communications.' },
-        ta: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'ஆதார் மற்றும் வங்கிக் கணக்குடன் இணைக்கப்பட்ட 10 இலக்க மொபைல் எண்ணை உள்ளிடவும்.', reason: 'Required for OTP validations, alerts, and transactional communications.' },
-        bn: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'আধার ও ব্যাংক অ্যাকাউন্টের সাথে যুক্ত ১০ সংখ্যার মোবাইল নম্বর লিখুন।', reason: 'Required for OTP validations, alerts, and transactional communications.' },
-        mr: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'आधार आणि बँक खात्याशी जोडलेला 10 अंकी मोबाईल नंबर टाका.', reason: 'Required for OTP validations, alerts, and transactional communications.' },
-        te: { tip: 'Enter your active 10-digit mobile number linked to your bank account and Aadhaar.', regional: 'ఆధార్ మరియు బ్యాంకు ఖాతాతో అనుసంధానమైన 10 అంకెల మొబైల్ నంబర్ నమోదు చేయండి.', reason: 'Required for OTP validations, alerts, and transactional communications.' },
+        en: {
+          tip: "Enter your active 10-digit mobile number.",
+          regional: "Provide the 10-digit phone number that is linked with your Aadhaar for receiving OTPs.",
+          reason: "Used for sending transaction alerts, monthly balance updates, and verifying login OTPs."
+        },
+        hinglish: {
+          tip: "Enter your active 10-digit mobile number.",
+          regional: "Apna 10-digit ka mobile number likhein jo Aadhaar se linked hai taaki OTP aa sake.",
+          reason: "Transaction updates, monthly balance messages aur login verification OTP pane ke liye use hota hai."
+        },
+        hi: {
+          tip: "Enter your active 10-digit mobile number.",
+          regional: "अपना 10-अंकीय मोबाइल नंबर दर्ज करें जो आपके आधार से जुड़ा है ताकि ओटीपी प्राप्त हो सके।",
+          reason: "लेनदेन अलर्ट, मासिक बैलेंस अपडेट और लॉगिन ओटीपी सत्यापित करने के लिए उपयोग किया जाता है।"
+        },
+        ta: {
+          tip: "Enter your active 10-digit mobile number.",
+          regional: "ஆதார் மற்றும் வங்கிக் கணக்குடன் இணைக்கப்பட்ட உங்கள் 10 இலக்க மொபைல் எண்ணை உள்ளிடவும்.",
+          reason: "பரிவர்த்தனை எச்சரிக்கைகள், மாதாந்திர இருப்பு விவரங்கள் மற்றும் உள்நுழைவுக்கான ஒடிபி (OTP) ஆகியவற்றை அனுப்பப் பயன்படுகிறது."
+        },
+        bn: {
+          tip: "Enter your active 10-digit mobile number.",
+          regional: "আপনার সচল ১০ সংখ্যার মোবাইল নম্বরটি লিখুন যা আধারের সাথে যুক্ত আছে।",
+          reason: "লেনদেনের অ্যালার্ট, মাসিক ব্যালেন্স আপডেট এবং লগইন ওটিপি (OTP) যাচাই করার জন্য ব্যবহৃত হয়।"
+        },
+        mr: {
+          tip: "Enter your active 10-digit mobile number.",
+          regional: "तुमचा चालू असलेला 10 अंकी मोबाईल नंबर टाका जो तुमच्या आधार कार्डशी जोडलेला आहे.",
+          reason: "व्यवहार अलर्ट, मासिक शिल्लक अपडेट आणि लॉगिन ओटीपी (OTP) पडताळणी पाठवण्यासाठी वापरला जातो."
+        },
+        te: {
+          tip: "Enter your active 10-digit mobile number.",
+          regional: "మీ ఆధార్ కార్డుతో అనుసంధానించబడిన 10 అంకెల మొబైల్ నంబరును నమోదు చేయండి.",
+          reason: "లావాదేవీ అలర్ట్‌లు, నెలవారీ బ్యాలెన్స్ అప్‌డేట్‌లు మరియు లాగిన్ ఓటీపీ (OTP)లను పంపడానికి ఉపయోగించబడుతుంది."
+        }
       },
       address: {
-        en: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'Write your full home address as it appears on your Aadhaar card.', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
-        hinglish: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'Apna pura ghar ka address likhein jaise Aadhaar mein hai — flat number, building, gali, sheher.', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
-        hi: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'फ्लैट नंबर, इमारत, गली और इलाके सहित अपना पूरा आवासीय पता दर्ज करें।', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
-        ta: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'ஃப்ளாட் எண், கட்டிடம், தெரு மற்றும் பகுதி உட்பட உங்கள் முழு முகவரியை உள்ளிடவும்.', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
-        bn: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'ফ্ল্যাট নম্বর, ভবন, রাস্তা এবং এলাকা সহ আপনার সম্পূর্ণ বাড়ির ঠিকানা লিখুন।', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
-        mr: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'फ्लॅट नंबर, इमारत, रस्ता आणि परिसरासह संपूर्ण राहणीचा पत्ता लिहा.', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
-        te: { tip: 'Enter your complete residential address including flat number, building, street, and locality.', regional: 'ఫ్లాట్ నంబర్, భవనం, వీధి మరియు ప్రాంతంతో పూర్తి నివాస చిరునామా నమోదు చేయండి.', reason: 'Necessary for mailing debit cards, checkbooks, and physical statements.' },
+        en: {
+          tip: "Enter your complete residential address including house number, building, street, and town.",
+          regional: "Provide your current full address where you reside, matching your proof of address document.",
+          reason: "Required to mail checkbooks, debit cards, and important bank letters to your home."
+        },
+        hinglish: {
+          tip: "Enter your complete residential address including house number, building, street, and town.",
+          regional: "Apna poora address likhein — ghar ka number, building, gali, aur sheher jo address proof card par hai.",
+          reason: "Cheque book, ATM card aur important bank letters aapke ghar bhejne ke liye chahiye."
+        },
+        hi: {
+          tip: "Enter your complete residential address including house number, building, street, and town.",
+          regional: "मकान नंबर, इमारत, गली और शहर सहित अपना पूरा पता दर्ज करें जैसा आपके पते के प्रमाण पत्र में है।",
+          reason: "चेकबुक, डेबिट कार्ड और महत्वपूर्ण बैंक पत्र आपके घर भेजने के लिए आवश्यक है।"
+        },
+        ta: {
+          tip: "Enter your complete residential address including house number, building, street, and town.",
+          regional: "வீட்டு எண், தெரு மற்றும் ஊர் பெயர் உட்பட உங்களின் முழு வீட்டு முகவரியை உள்ளிடவும்.",
+          reason: "செக் புக், டெபிட் கார்டு மற்றும் முக்கியமான வங்கி கடிதங்களை உங்கள் வீட்டிற்கு அனுப்ப தேவைப்படுகிறது."
+        },
+        bn: {
+          tip: "Enter your complete residential address including house number, building, street, and town.",
+          regional: "আপনার বাড়ির নম্বর, রাস্তা এবং শহরের নাম সহ সম্পূর্ণ ঠিকানাটি লিখুন যা আপনার ঠিকানার প্রমাণপত্রে আছে।",
+          reason: "আপনার বাড়িতে চেক বই, ডেবিট কার্ড এবং ব্যাঙ্কের গুরুত্বপূর্ণ চিঠি পাঠাতে এটি প্রয়োজনীয়।"
+        },
+        mr: {
+          tip: "Enter your complete residential address including house number, building, street, and town.",
+          regional: "घर क्रमांक, इमारत, रस्ता आणि गावाच्या नावासह तुमचा संपूर्ण पत्ता लिहा.",
+          reason: "चेकबुक, डेबिट कार्ड आणि महत्त्वाचे बँक पत्र तुमच्या घरी पाठवण्यासाठी आवश्यक आहे."
+        },
+        te: {
+          tip: "Enter your complete residential address including house number, building, street, and town.",
+          regional: "మీ ఇంటి నంబర్, వీధి మరియు ఊరి పేరుతో సహా పూర్తి నివాస చిరునామాను నమోదు చేయండి.",
+          reason: "చెక్ బుక్స్, డెబిట్ కార్డ్స్ మరియు ముఖ్యమైన బ్యాంక్ లేఖలను మీ ఇంటికి పంపడానికి ఇది అవసరం."
+        }
       },
       pincode: {
-        en: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'Enter the 6-digit PIN code for your area as in your Aadhaar.', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
-        hinglish: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'Apne area ka 6-digit PIN code daalen jaise Aadhaar mein hai.', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
-        hi: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'अपने क्षेत्र का 6-अंकीय पिनकोड दर्ज करें जैसा आधार में है।', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
-        ta: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'உங்கள் ஆதார் கார்டில் உள்ள 6 இலக்க பின் குறியீட்டை உள்ளிடவும்.', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
-        bn: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'আপনার আধার কার্ডে থাকা ৬ সংখ্যার পিনকোড লিখুন।', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
-        mr: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'आधार कार्डवर असलेला 6 अंकी पिनकोड टाका.', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
-        te: { tip: 'Enter the 6-digit postal code (PIN) corresponding to your residential address.', regional: 'మీ ఆధార్ కార్డులో ఉన్న 6 అంకెల పిన్ కోడ్ నమోదు చేయండి.', reason: 'Verifies geographic jurisdiction and helps in sorting logistics.' },
+        en: {
+          tip: "Enter the 6-digit postal code (PIN code) of your address.",
+          regional: "Provide the 6-digit PIN code of your area. This helps the bank locate your post office.",
+          reason: "Ensures speedy delivery of debit cards and official correspondence, and routes your profile to the nearest branch."
+        },
+        hinglish: {
+          tip: "Enter the 6-digit postal code (PIN code) of your address.",
+          regional: "Apne area ka 6-digit PIN code likhein taaki post office and branch locate ho sake.",
+          reason: "Isse post delivery fast hoti hai aur bank ko pata chalta hai ki sabse paas wali branch kaunsi hai."
+        },
+        hi: {
+          tip: "Enter the 6-digit postal code (PIN code) of your address.",
+          regional: "अपने क्षेत्र का 6-अंकीय पिन कोड दर्ज करें। इससे डाकघर और शाखा का पता लगाने में मदद मिलती है।",
+          reason: "डेबिट कार्ड और आधिकारिक पत्रों की तेजी से डिलीवरी सुनिश्चित करता है, और आपके पते को निकटतम शाखा से जोड़ता है।"
+        },
+        ta: {
+          tip: "Enter the 6-digit postal code (PIN code) of your address.",
+          regional: "உங்கள் முகவரியின் 6 இலக்க அஞ்சல் குறியீட்டை (PIN code) உள்ளிடவும்.",
+          reason: "டெபிட் கார்டுகள் மற்றும் அதிகாரப்பூர்வ கடிதங்கள் விரைவாக விநியோகிக்கப்படுவதை உறுதி செய்கிறது, மேலும் உங்கள் சுயவிவரத்தை அருகிலுள்ள கிளைக்கு வழிநடத்துகிறது."
+        },
+        bn: {
+          tip: "Enter the 6-digit postal code (PIN code) of your address.",
+          regional: "আপনার এলাকার ৬ সংখ্যার পিন কোডটি লিখুন। এটি আপনার পোস্ট অফিস সনাক্ত করতে সাহায্য করে।",
+          reason: "ডেবিট কার্ড এবং অফিসিয়াল চিঠিপত্র দ্রুত সরবরাহ নিশ্চিত করে এবং আপনার অ্যাকাউন্টটিকে নিকটস্থ শাখার সাথে লিঙ্ক করতে সাহায্য করে।"
+        },
+        mr: {
+          tip: "Enter the 6-digit postal code (PIN code) of your address.",
+          regional: "तुमच्या पत्त्याचा ६ अंकी पिन कोड लिहा. यामुळे बँकेला तुमचे पोस्ट ऑफिस शोधण्यास मदत होते.",
+          reason: "डेबिट कार्ड आणि अधिकृत पत्रांचे जलद वितरण सुनिश्चित करते आणि तुमचे प्रोफाइल सर्वात जवळच्या शाखेशी जोडते."
+        },
+        te: {
+          tip: "Enter the 6-digit postal code (PIN code) of your address.",
+          regional: "మీ చిరునామా యొక్క 6 అంకెల పిన్ కోడ్‌ను ఇక్కడ నమోదు చేయండి.",
+          reason: "డెబిట్ కార్డులు మరియు అధికారిక లేఖల వేగవంతమైన డెలివరీని నిర్ధారిస్తుంది, మరియు మీ ప్రొఫైల్‌ను సమీప శాఖకు అనుసంధానిస్తుంది."
+        }
       },
       accountType: {
-        en: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'Select what type of bank account you want to open.', reason: 'Determines the minimum balance requirements and interest rates.' },
-        hinglish: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'Select karein ki aap kaun sa account kholna chahte hain — Savings, Current ya Salary.', reason: 'Determines the minimum balance requirements and interest rates.' },
-        hi: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'चुनें कि आप कौन सा खाता खोलना चाहते हैं — बचत, चालू या वेतन खाता।', reason: 'Determines the minimum balance requirements and interest rates.' },
-        ta: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'நீங்கள் திறக்க விரும்பும் கணக்கு வகையை தேர்ந்தெடுக்கவும் — சேமிப்பு, நடப்பு அல்லது சம்பளம்.', reason: 'Determines the minimum balance requirements and interest rates.' },
-        bn: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'আপনি কোন ধরনের অ্যাকাউন্ট খুলতে চান তা নির্বাচন করুন — সেভিংস, কারেন্ট বা স্যালারি।', reason: 'Determines the minimum balance requirements and interest rates.' },
-        mr: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'तुम्हाला कोणते खाते उघडायचे आहे ते निवडा — बचत, चालू किंवा पगार.', reason: 'Determines the minimum balance requirements and interest rates.' },
-        te: { tip: 'Choose the specific account tier you are opening: Savings, Current, or Salary.', regional: 'మీరు ఏ ఖాతా తెరవాలని ఉందో ఎంచుకోండి — పొదుపు, కరెంట్ లేదా జీతం ఖాతా.', reason: 'Determines the minimum balance requirements and interest rates.' },
+        en: {
+          tip: "Select the type of account you wish to open (Savings, Current, Salary).",
+          regional: "Choose whether you want a regular Savings account, Current account, or Salary account.",
+          reason: "Determines the interest rates, withdrawal limits, and minimum balance rules for your account."
+        },
+        hinglish: {
+          tip: "Select the type of account you wish to open (Savings, Current, Salary).",
+          regional: "Select karein ki aap Savings, Current, ya Salary account mein se kaun sa kholna chahte hain.",
+          reason: "Isse aapke interest rate, withdrawal limit aur minimum balance ke rules decide hote hain."
+        },
+        hi: {
+          tip: "Select the type of account you wish to open (Savings, Current, Salary).",
+          regional: "चुनें कि आप किस प्रकार का खाता खोलना चाहते हैं (बचत, चालू, या वेतन खाता)।",
+          reason: "यह आपके खाते के लिए ब्याज दरों, निकासी सीमाओं और न्यूनतम शेष राशि के नियमों को निर्धारित करता है।"
+        },
+        ta: {
+          tip: "Select the type of account you wish to open (Savings, Current, Salary).",
+          regional: "நீங்கள் தொடங்க விரும்பும் கணக்கின் வகையைத் தேர்ந்தெடுக்கவும் (சேமிப்பு, நடப்பு அல்லது சம்பளக் கணக்கு).",
+          reason: "உங்கள் கணக்கிற்கான வட்டி விகிதங்கள், பணம் எடுக்கும் வரம்புகள் மற்றும் குறைந்தபட்ச இருப்பு விதிகளை தீர்மானிக்கிறது."
+        },
+        bn: {
+          tip: "Select the type of account you wish to open (Savings, Current, Salary).",
+          regional: "আপনি কোন ধরনের অ্যাকাউন্ট খুলতে চান তা বেছে নিন (সঞ্চয়ী, চলতি, বা বেতন অ্যাকাউন্ট)।",
+          reason: "এটি আপনার অ্যাকাউন্টের সুদের হার, টাকা তোলার সীমা এবং ন্যূনতম ব্যালেন্সের নিয়মগুলি নির্ধারণ করে।"
+        },
+        mr: {
+          tip: "Select the type of account you wish to open (Savings, Current, Salary).",
+          regional: "तुम्हाला कोणत्या प्रकारचे खाते उघडायचे आहे ते निवडा (बचत, चालू किंवा पगार खाते).",
+          reason: "तुमच्या खात्यासाठीचे व्याजदर, पैसे काढण्याची मर्यादा आणि किमान शिल्लक रकमेचे नियम ठरवते."
+        },
+        te: {
+          tip: "Select the type of account you wish to open (Savings, Current, Salary).",
+          regional: "మీరు తెరవాలనుకుంటున్న ఖాతా రకాన్ని ఎంచుకోండి (పొదుపు, కరెంట్ లేదా జీతాల ఖాతా).",
+          reason: "మీ ఖాతాకు సంబంధించిన వడ్డీ రేట్లు, విత్‌డ్రా పరిమితులు మరియు కనీస నిల్వ నిబంధనలను ఇది నిర్ణయిస్తుంది."
+        }
       },
       nomineeName: {
-        en: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'Write the complete name of the person who will receive your account funds if something happens to you.', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
-        hinglish: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'Us insaan ka pura naam likhein jise aap apne account ka nominee banana chahte hain.', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
-        hi: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'उस व्यक्ति का पूरा नाम दर्ज करें जिसे आप इस खाते के लिए नॉमिनी बनाना चाहते हैं।', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
-        ta: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'நீங்கள் நியமிக்க விரும்பும் நபரின் முழு பெயரை உள்ளிடவும்.', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
-        bn: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'আপনি যাকে নমিনি করতে চান তার পুরো নাম লিখুন।', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
-        mr: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'तुम्हाला ज्याला नॉमिनी करायचे आहे त्याचे पूर्ण नाव लिहा.', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
-        te: { tip: 'Enter the full name of the person you want to nominate for this account.', regional: 'మీరు నామినీగా నియమించాలనుకుంటున్న వ్యక్తి పూర్తి పేరు నమోదు చేయండి.', reason: 'Required to ensure hassle-free transfer of funds to your legal heir in the future.' },
+        en: {
+          tip: "Enter the full name of your nominated beneficiary.",
+          regional: "Write the full legal name of the person who should receive the funds in case of emergency.",
+          reason: "Required to designate a legal beneficiary who can receive the deposits in case of the account holder's demise."
+        },
+        hinglish: {
+          tip: "Enter the full name of your nominated beneficiary.",
+          regional: "Nominee ka poora naam likhein jo aapke baad account ke paise receive kar sake.",
+          reason: "Aapke baad aapke paise kisko milenge, us legal nominee ko decide karne ke liye zaruri hai."
+        },
+        hi: {
+          tip: "Enter the full name of your nominated beneficiary.",
+          regional: "अपने नामांकित व्यक्ति (नॉमिनी) का पूरा नाम लिखें जो आपकी अनुपस्थिति में राशि प्राप्त कर सके।",
+          reason: "खाताधारक की मृत्यु के मामले में जमा राशि प्राप्त करने वाले कानूनी लाभार्थी को नामित करने के लिए आवश्यक है।"
+        },
+        ta: {
+          tip: "Enter the full name of your nominated beneficiary.",
+          regional: "பரிந்துரையாளரின் (Nominee) முழு பெயரை எழுதவும்.",
+          reason: "கணக்கு வைத்திருப்பவர் இறக்க நேரிட்டால், டெபாசிட் தொகையைப் பெறக்கூடிய சட்டப்பூர்வ பயனாளியை நியமிக்க தேவைப்படுகிறது."
+        },
+        bn: {
+          tip: "Enter the full name of your nominated beneficiary.",
+          regional: "আপনার মনোনীত নমিনির পুরো নাম লিখুন যিনি আপনার অনুপস্থিতিতে আমানত গ্রহণ করতে পারবেন।",
+          reason: "অ্যাকাউন্ট হোল্ডারের মৃত্যুর ক্ষেত্রে জমাকৃত অর্থ গ্রহণ করতে পারবেন এমন একজন আইনি নমিনি মনোনীত করা প্রয়োজনীয়।"
+        },
+        mr: {
+          tip: "Enter the full name of your nominated beneficiary.",
+          regional: "तुम्ही नियुक्त केलेल्या वारसदाराचे (नॉमिनीचे) पूर्ण नाव लिहा.",
+          reason: "खातेदाराच्या मृत्यूनंतर बँकेतील रक्कम मिळण्यासाठी कायदेशीर वारसदार (नॉमिनी) नियुक्त करणे आवश्यक आहे."
+        },
+        te: {
+          tip: "Enter the full name of your nominated beneficiary.",
+          regional: "మీరు నామినేట్ చేయాలనుకుంటున్న వ్యక్తి యొక్క పూర్తి పేరును ఇక్కడ రాయండి.",
+          reason: "ఖాతాదారుడు మరణించిన సందర్భంలో డిపాజిట్లను అందుకోగల చట్టపరమైన నామినీని నియమించడానికి ఇది అవసరం."
+        }
       },
+      monthlyIncome: {
+        en: {
+          tip: "Enter your net monthly income in Indian Rupees.",
+          regional: "Provide the exact amount you earn in a month after taxes and deductions.",
+          reason: "Required by the bank to assess your loan repayment capacity and set appropriate credit limits."
+        },
+        hinglish: {
+          tip: "Enter your net monthly income in Indian Rupees.",
+          regional: "Apni har mahine ki net income (salary) bhariye, tax aur deductions katne ke baad.",
+          reason: "Bank ko check karna hota hai ki aap loan chuka payenge ya nahi aur credit limit set karne ke liye."
+        },
+        hi: {
+          tip: "Enter your net monthly income in Indian Rupees.",
+          regional: "टैक्स और कटौती के बाद हर महीने मिलने वाली अपनी शुद्ध आय (Net Income) दर्ज करें।",
+          reason: "बैंक द्वारा आपकी ऋण पुनर्भुगतान क्षमता का आकलन करने और उचित क्रेडिट सीमा निर्धारित करने के लिए आवश्यक है।"
+        },
+        ta: {
+          tip: "Enter your net monthly income in Indian Rupees.",
+          regional: "வரி மற்றும் பிற பிடித்தங்களுக்குப் பிறகு உங்களின் நிகர மாத வருமானத்தை உள்ளிடவும்.",
+          reason: "வங்கி உங்களின் கடன் திருப்பிச் செலுத்தும் திறனை மதிப்பிடவும், தகுந்த கடன் வரம்புகளை நிர்ணயிக்கவும் இது தேவைப்படுகிறது."
+        },
+        bn: {
+          tip: "Enter your net monthly income in Indian Rupees.",
+          regional: "কর ও অন্যান্য কাটার পর প্রতি মাসে আপনার ঘরে আসা আসল আয় বা নেট বেতনের পরিমাণ লিখুন।",
+          reason: "আপনার ঋণ পরিশোধের ক্ষমতা মূল্যায়ন করতে এবং উপযুক্ত ক্রেডিট সীমা নির্ধারণ করতে ব্যাঙ্কের এটি প্রয়োজন।"
+        },
+        mr: {
+          tip: "Enter your net monthly income in Indian Rupees.",
+          regional: "कर व वजावट वगळता तुमच्या हातात येणारे निव्वळ मासिक उत्पन्न किती आहे ते लिहा.",
+          reason: "बँकेला तुमची कर्ज फेडण्याची क्षमता तपासण्यासाठी आणि योग्य क्रेडिट मर्यादा ठरवण्यासाठी आवश्यक आहे."
+        },
+        te: {
+          tip: "Enter your net monthly income in Indian Rupees.",
+          regional: "పన్నులు మరియు కటింగ్స్ పోగా మీకు లభించే నికర నెలవారీ ఆదాయాన్ని నమోదు చేయండి.",
+          reason: "బ్యాంకు మీ రుణాన్ని తిరిగి చెల్లించే సామర్థ్యాన్ని అంచనా వేయడానికి మరియు తగిన క్రెడిట్ పరిమితులను నిర్ణయించడానికి ఇది అవసరం."
+        }
+      },
+      employerName: {
+        en: {
+          tip: "Enter the full name of the company or organization you work for.",
+          regional: "Write the official registered name of your employer or business entity.",
+          reason: "Helps the bank verify your employment stability and categorize you as a salaried or self-employed customer."
+        },
+        hinglish: {
+          tip: "Enter the full name of the company or organization you work for.",
+          regional: "Apni company ya office ka registered naam likhein jahan aap kaam karte hain.",
+          reason: "Aapki naukri ki stability verify karne aur salaried/self-employed category decide karne mein help karta hai."
+        },
+        hi: {
+          tip: "Enter the full name of the company or organization you work for.",
+          regional: "उस कंपनी या संगठन का पूरा नाम लिखें जिसके लिए आप काम करते हैं।",
+          reason: "बैंक को आपकी रोजगार स्थिरता को सत्यापित करने और आपको वेतनभोगी या स्व-नियोजित ग्राहक के रूप में वर्गीकृत करने में मदद करता है।"
+        },
+        ta: {
+          tip: "Enter the full name of the company or organization you work for.",
+          regional: "நீங்கள் பணிபுரியும் நிறுவனம் அல்லது அமைப்பின் முழு பெயரை உள்ளிடவும்.",
+          reason: "வங்கி உங்களின் வேலை ஸ்திரத்தன்மையை சரிபார்க்கவும், உங்களை சம்பளம் பெறுபவர் அல்லது சுயதொழில் செய்பவராக வகைப்படுத்தவும் உதவுகிறது."
+        },
+        bn: {
+          tip: "Enter the full name of the company or organization you work for.",
+          regional: "আপনি যে কোম্পানি বা সংস্থায় কাজ করেন তার সম্পূর্ণ নাম লিখুন।",
+          reason: "ব্যাঙ্ককে আপনার চাকরির স্থায়িত্ব যাচাই করতে এবং আপনাকে বেতনভোগী বা স্ব-নিযুক্ত গ্রাহক হিসেবে শ্রেণীবদ্ধ করতে সাহায্য করে।"
+        },
+        mr: {
+          tip: "Enter the full name of the company or organization you work for.",
+          regional: "तुम्ही ज्या कंपनीत किंवा संस्थेत काम करता त्याचे अधिकृत नाव लिहा.",
+          reason: "बँकेला तुमच्या नोकरीची स्थिरता तपासण्यास आणि तुम्हाला पगारदार किंवा स्वयंरोजगार ग्राहक म्हणून वर्गीकृत करण्यास मदत करते."
+        },
+        te: {
+          tip: "Enter the full name of the company or organization you work for.",
+          regional: "మీరు పనిచేస్తున్న కంపెనీ లేదా సంస్థ యొక్క పూర్తి పేరును రాయండి.",
+          reason: "బ్యాంకు మీ ఉపాధి స్థిరత్వాన్ని ధృవీకరించడానికి మరియు మిమ్మల్ని జీతభత్యాలు పొందే లేదా స్వయం ఉపాధి పొందే కస్టమర్‌గా వర్గీకరించడానికి సహాయపడుతుంది."
+        }
+      },
+      loanAmount: {
+        en: {
+          tip: "Enter the total loan amount you wish to borrow in Rupees.",
+          regional: "Specify the amount of money you want to request as a loan from the bank.",
+          reason: "Specifies the funding amount requested, used to calculate monthly EMI and interest schedule options."
+        },
+        hinglish: {
+          tip: "Enter the total loan amount you wish to borrow in Rupees.",
+          regional: "Aapko kitne loan ki jarurat hai, woh total amount Rupees mein likhein.",
+          reason: "Isse EMI aur interest rates ki calculation hoti hai jisse aapko suitable plans diye ja sakein."
+        },
+        hi: {
+          tip: "Enter the total loan amount you wish to borrow in Rupees.",
+          regional: "जितने ऋण की आपको आवश्यकता है, वह कुल राशि रुपये में दर्ज करें।",
+          reason: "अनुरोधित राशि को निर्दिष्ट करता है, जिसका उपयोग मासिक ईएमआई और ब्याज दरों की गणना के लिए किया जाता है।"
+        },
+        ta: {
+          tip: "Enter the total loan amount you wish to borrow in Rupees.",
+          regional: "நீங்கள் பெற விரும்பும் மொத்த கடன் தொகையை ரூபாயில் குறிப்பிடவும்.",
+          reason: "கோரப்பட்ட கடன் தொகையைக் குறிப்பிடுகிறது, இது மாதாந்திர இஎம்ஐ (EMI) மற்றும் வட்டி அட்டவணை விருப்பங்களைக் கணக்கிடப் பயன்படுகிறது."
+        },
+        bn: {
+          tip: "Enter the total loan amount you wish to borrow in Rupees.",
+          regional: "আপনি মোট কত টাকা ঋণ নিতে চান তা অংকে লিখুন।",
+          reason: "অনুরোধ করা ঋণের পরিমাণ নির্দিষ্ট করে, যা মাসিক ইএমআই (EMI) এবং সুদের হিসাব গণনা করতে ব্যবহৃত হয়।"
+        },
+        mr: {
+          tip: "Enter the total loan amount you wish to borrow in Rupees.",
+          regional: "तुम्हाला हव्या असलेल्या एकूण कर्ज रकमेची नोंद करा.",
+          reason: "मागणी केलेल्या कर्जाची रक्कम दर्शवते, ज्याचा वापर मासिक ईएमआय (EMI) आणि व्याज मोजण्यासाठी केला जातो."
+        },
+        te: {
+          tip: "Enter the total loan amount you wish to borrow in Rupees.",
+          regional: "మీకు కావలసిన మొత్తం రుణ మొత్తాన్ని రూపాయలలో నమోదు చేయండి.",
+          reason: "కోరబడిన నిధుల మొత్తాన్ని ఇది తెలియజేస్తుంది, దీని ద్వారా నెలవారీ ఈఎంఐ (EMI) మరియు వడ్డీని లెక్కిస్తారు."
+        }
+      },
+      branchName: {
+        en: {
+          tip: "Enter the branch name where your deposit or account is maintained.",
+          regional: "Write the name of the bank branch where you are submitting this application.",
+          reason: "Determines the specific bank office where your account records are hosted and serviced."
+        },
+        hinglish: {
+          tip: "Enter the branch name where your deposit or account is maintained.",
+          regional: "Apni bank branch ka naam likhein jahan aapka account khola ja raha hai.",
+          reason: "Isse pata chalta hai ki aapke account records kis specific branch office mein store kiye jayenge."
+        },
+        hi: {
+          tip: "Enter the branch name where your deposit or account is maintained.",
+          regional: "उस बैंक शाखा का नाम लिखें जहाँ आपका खाता खोला जा रहा है या जमा रखा जा रहा है।",
+          reason: "उस विशिष्ट बैंक कार्यालय को निर्धारित करता है जहां आपके खाता रिकॉर्ड रखे जाते हैं और सेवाएं दी जाती हैं।"
+        },
+        ta: {
+          tip: "Enter the branch name where your deposit or account is maintained.",
+          regional: "உங்களின் வைப்புத்தொகை அல்லது கணக்கு உள்ள வங்கியின் கிளைப் பெயரை உள்ளிடவும்.",
+          reason: "உங்கள் கணக்கு பதிவுகள் பராமரிக்கப்படும் மற்றும் சேவை வழங்கப்படும் குறிப்பிட்ட வங்கி கிளையை தீர்மானிக்கிறது."
+        },
+        bn: {
+          tip: "Enter the branch name where your deposit or account is maintained.",
+          regional: "যে শাখায় আপনার অ্যাকাউন্ট বা আমানত রয়েছে তার নাম লিখুন।",
+          reason: "নির্দিষ্ট ব্যাঙ্কের শাখাটি নির্ধারণ করে যেখানে আপনার অ্যাকাউন্ট রেকর্ড রাখা হবে এবং পরিষেবা দেওয়া হবে।"
+        },
+        mr: {
+          tip: "Enter the branch name where your deposit or account is maintained.",
+          regional: "तुमचे खाते किंवा ठेव ज्या शाखेत आहे त्या शाखेचे नाव लिहा.",
+          reason: "तुमच्या खात्याचे रेकॉर्ड कोणत्या बँक शाखेत ठेवले आणि हाताळले जातील हे ठरवते."
+        },
+        te: {
+          tip: "Enter the branch name where your deposit or account is maintained.",
+          regional: "మీ డిపాజిట్ లేదా ఖాతా ఉన్న బ్యాంక్ బ్రాంచ్ పేరును ఇక్కడ రాయండి.",
+          reason: "మీ ఖాతా రికార్డులు ఉంచబడే మరియు సేవలు అందించబడే నిర్దిష్ట బ్యాంక్ కార్యాలయాన్ని ఇది నిర్ణయిస్తుంది."
+        }
+      },
+      depositNature: {
+        en: {
+          tip: "Enter the nature/type of deposit (Savings, Fixed, Recurring).",
+          regional: "Specify the type of deposit, such as Fixed Deposit (FD) or Recurring Deposit (RD).",
+          reason: "Identifies the account scheme type, which determines interest yield and withdrawal rules."
+        },
+        hinglish: {
+          tip: "Enter the nature/type of deposit (Savings, Fixed, Recurring).",
+          regional: "Deposit ka type likhein, jaise FD (Fixed) ya RD (Recurring) ya Savings account.",
+          reason: "Isse account ka type pata chalta hai, jo interest rate aur withdrawal rules ko decide karta hai."
+        },
+        hi: {
+          tip: "Enter the nature/type of deposit (Savings, Fixed, Recurring).",
+          regional: "जमा का प्रकार लिखें (जैसे बचत बैंक, सावधि जमा - FD, या आवर्ती जमा - RD)।",
+          reason: "खाता योजना के प्रकार की पहचान करता है, जो ब्याज दर और निकासी के नियमों को निर्धारित करता है।"
+        },
+        ta: {
+          tip: "Enter the nature/type of deposit (Savings, Fixed, Recurring).",
+          regional: "வைப்புத்தொகையின் வகையைக் குறிப்பிடவும் (சேமிப்பு, நிலையான வைப்பு அல்லது தொடர் வைப்பு).",
+          reason: "கணக்கு திட்ட வகையை அடையாளப்படுத்துகிறது, இது வட்டி வருவாய் மற்றும் பணம் எடுக்கும் விதிகளை தீர்மானிக்கிறது."
+        },
+        bn: {
+          tip: "Enter the nature/type of deposit (Savings, Fixed, Recurring).",
+          regional: "আমানতের ধরণ লিখুন (যেমন সেভিংস ব্যাঙ্ক, ফিক্সড ডিপোজিট বা আরডি)।",
+          reason: "অ্যাকাউন্টের ধরন চিহ্নিত করে, যা সুদের হার এবং টাকা তোলার নিয়ম নির্ধারণ করে।"
+        },
+        mr: {
+          tip: "Enter the nature/type of deposit (Savings, Fixed, Recurring).",
+          regional: "ठेवीचे स्वरूप लिहा (उदा. बचत ठेव, मुदत ठेव - FD किंवा आवर्ती ठेव - RD).",
+          reason: "ठेवीचा प्रकार स्पष्ट करतो, ज्यावरून व्याजदर आणि पैसे काढण्याचे नियम ठरतात."
+        },
+        te: {
+          tip: "Enter the nature/type of deposit (Savings, Fixed, Recurring).",
+          regional: "డిపాజిట్ రకాన్ని నమోదు చేయండి (పొదుపు ఖాతా, ఫిక్స్‌డ్ డిపాజిట్ లేదా రికరింగ్ డిపాజిట్).",
+          reason: "ఖాతా పథకం రకాన్ని గుర్తిస్తుంది, ఇది వడ్డీ మరియు విత్‌డ్రా నిబంధనలను నిర్ణయిస్తుంది."
+        }
+      },
+      depositDistNo: {
+        en: {
+          tip: "Enter the account number or receipt number for this deposit.",
+          regional: "Provide the unique number of your deposit receipt or your bank account number.",
+          reason: "Provides the unique identifier for the specific deposit receipt or ledger account to apply nomination."
+        },
+        hinglish: {
+          tip: "Enter the account number or receipt number for this deposit.",
+          regional: "Deposit receipt number ya account number likhein jise link karna hai.",
+          reason: "Isse deposit receipt ya account ka unique number pata chalta hai jahan nomination link hona hai."
+        },
+        hi: {
+          tip: "Enter the account number or receipt number for this deposit.",
+          regional: "इस जमा के लिए खाता संख्या या जमा रसीद संख्या दर्ज करें।",
+          reason: "नामांकन लागू करने के लिए विशिष्ट जमा रसीद या खाता संख्या के लिए विशिष्ट पहचानकर्ता प्रदान करता है।"
+        },
+        ta: {
+          tip: "Enter the account number or receipt number for this deposit.",
+          regional: "இந்த வைப்புத்தொகைக்கான கணக்கு எண் அல்லது ரசீது எண்ணை உள்ளிடவும்.",
+          reason: "பரிந்துரையை இணைக்க வேண்டிய டெபாசிట్ రసీదు లేదా கணக்கின் தனித்துவமான எண்ணை வழங்குகிறது."
+        },
+        bn: {
+          tip: "Enter the account number or receipt number for this deposit.",
+          regional: "এই আমানতের জন্য অ্যাকাউন্ট নম্বর বা রসিদ নম্বরটি লিখুন।",
+          reason: "মনোনয়ন লিঙ্ক করার জন্য নির্দিষ্ট আমানত রসিদ বা খতিয়ান অ্যাকাউন্টের অনন্য নম্বর প্রদান করে।"
+        },
+        mr: {
+          tip: "Enter the account number or receipt number for this deposit.",
+          regional: "या ठेवीशी संबंधित असलेला खाते क्रमांक किंवा पावती क्रमांक लिहा.",
+          reason: "वारसदार नोंदणी करण्यासाठी विशिष्ट ठेव पावती किंवा खाते क्रमांक स्पष्ट करतो."
+        },
+        te: {
+          tip: "Enter the account number or receipt number for this deposit.",
+          regional: "ఈ డిపాజిట్‌కు సంబంధించిన ఖాతా సంఖ్య లేదా రశీదు సంఖ్యను నమోదు చేయండి.",
+          reason: "నామినేషన్ అనుసంధానించడానికి నిర్దిష్ట డిపాజిట్ రసీదు లేదా ఖాతా యొక్క ప్రత్యేక గుర్తింపు సంఖ్యను అందిస్తుంది."
+        }
+      },
+      depositDetails: {
+        en: {
+          tip: "Enter additional details like maturity instructions or deposit duration.",
+          regional: "Write details like duration of deposit, maturity instructions, or interest payout frequency.",
+          reason: "Captures terms like duration and maturity instructions to avoid discrepancies at payout."
+        },
+        hinglish: {
+          tip: "Enter additional details like maturity instructions or deposit duration.",
+          regional: "Deposit ki duration aur maturity instructions jaisi extra details bhariye.",
+          reason: "Ismein deposit ki maturity instructions aur duration fill ki jati hai taaki bad mein koi problem na ho."
+        },
+        hi: {
+          tip: "Enter additional details like maturity instructions or deposit duration.",
+          regional: "जमा अवधि और परिपक्वता निर्देशों (Maturity Instructions) जैसी अतिरिक्त जानकारी दर्ज करें।",
+          reason: "भुगतान के समय विसंगतियों से बचने के लिए अवधि और परिपक्वता निर्देशों जैसे विवरण दर्ज करता है।"
+        },
+        ta: {
+          tip: "Enter additional details like maturity instructions or deposit duration.",
+          regional: "வைப்புத்தொகையின் முதிர்வு வழிமுறைகள் அல்லது காலம் போன்ற கூடுதல் விவரங்களை உள்ளிடவும்.",
+          reason: "பணம் செலுத்தும் போது ஏற்படும் முரண்பாடுகளைத் தவிர்க்க, டெபாசிட் காலம் மற்றும் முதிர்வு வழிமுறைகளை பதிவு செய்கிறது."
+        },
+        bn: {
+          tip: "Enter additional details like maturity instructions or deposit duration.",
+          regional: "আমানতের মেয়াদ বা ম্যাচুরিটির নির্দেশাবলীর মতো অতিরিক্ত তথ্য লিখুন।",
+          reason: "পরিশোধের সময় কোনো ঝামেলা এড়াতে আমানতের মেয়াদ এবং পরিপক্কতার নির্দেশাবলী রেকর্ড করে।"
+        },
+        mr: {
+          tip: "Enter additional details like maturity instructions or deposit duration.",
+          regional: "ठेवीचा कालावधी किंवा मॅच्युरिटीच्या सूचनांसारखे अतिरिक्त तपशील लिहा.",
+          reason: "पैसे मिळताना कोणतीही अडचण येऊ नये म्हणून ठेव कालावधी आणि मॅच्युरिटीच्या सूचनांची नोंद ठेवते."
+        },
+        te: {
+          tip: "Enter additional details like maturity instructions or deposit duration.",
+          regional: "డిపాజిట్ వ్యవధి మరియు మెచ్యూరిటీ సూచనల వంటి అదనపు వివరాలను నమోదు చేయండి.",
+          reason: "చెల్లింపు సమయంలో ఎటువంటి వ్యత్యాసాలు రాకుండా వ్యవధి మరియు మెచ్యూరిటీ సూచనల వంటి వివరాలను నమోదు చేస్తుంది."
+        }
+      },
+      nomineeAddress: {
+        en: {
+          tip: "Enter the complete address and mobile number of the nominee.",
+          regional: "Write the residential address and phone number of the nominated person.",
+          reason: "Helps the bank contact the nominee and verify their physical identity at the time of claim."
+        },
+        hinglish: {
+          tip: "Enter the complete address and mobile number of the nominee.",
+          regional: "Nominee ka poora residential address aur mobile number likhein.",
+          reason: "Bank ko nominee se contact karne aur claim ke samay unki address verification ke liye zaruri hai."
+        },
+        hi: {
+          tip: "Enter the complete address and mobile number of the nominee.",
+          regional: "नामित व्यक्ति का पूरा पता और मोबाइल नंबर लिखें।",
+          reason: "दावे के समय नामांकित व्यक्ति से संपर्क करने और उनके पते को सत्यापित करने में बैंक की मदद करता है।"
+        },
+        ta: {
+          tip: "Enter the complete address and mobile number of the nominee.",
+          regional: "பரிந்துரையாளரின் முழு முகவரி மற்றும் மொபைல் எண்ணை உள்ளிடவும்.",
+          reason: "உரிமைகோரும் நேரத்தில் பரிந்துரையாளரைத் தொடர்பு கொள்ளவும், அவர்களின் முகவரியை சரிபார்க்கவும் வங்கிக்கு உதவுகிறது."
+        },
+        bn: {
+          tip: "Enter the complete address and mobile number of the nominee.",
+          regional: "নমিনির সম্পূর্ণ ঠিকানা এবং মোবাইল নম্বর লিখুন।",
+          reason: "দাবির সময় নমিনির সাথে যোগাযোগ করতে এবং তাদের বাড়ির ঠিকানা যাচাই করতে ব্যাঙ্ককে সাহায্য করে।"
+        },
+        mr: {
+          tip: "Enter the complete address and mobile number of the nominee.",
+          regional: "वारसदाराचा पूर्ण पत्ता आणि मोबाईल नंबर लिहा.",
+          reason: "हक्काच्या दाव्यावेळी वारसदाराशी संपर्क साधण्यास आणि त्यांच्या पत्त्याची पडताळणी करण्यास बँकेला मदत करते."
+        },
+        te: {
+          tip: "Enter the complete address and mobile number of the nominee.",
+          regional: "నామినీ యొక్క పూర్తి చిరునామా మరియు మొబైల్ నంబరును నమోదు చేయండి.",
+          reason: "క్లెయిమ్ సమయంలో నామినీని సంప్రదించడానికి మరియు వారి చిరునామాను ధృవీకరించడానికి బ్యాంకుకు సహాయపడుతుంది."
+        }
+      },
+      nomineeRelationship: {
+        en: {
+          tip: "State the nominee's relationship with you (e.g., Mother, Spouse, Son).",
+          regional: "Enter how the nominee is related to you, such as spouse, daughter, or brother.",
+          reason: "Establishes the family connection to validate the legitimacy of the nominated beneficiary."
+        },
+        hinglish: {
+          tip: "State the nominee's relationship with you (e.g., Mother, Spouse, Son).",
+          regional: "Nominee ke sath apna rishta likhein, jaise Maa, Beta, ya Wife.",
+          reason: "Nominee ke sath aapka rishta check karne ke liye taaki claim process sahi se ho sake."
+        },
+        hi: {
+          tip: "State the nominee's relationship with you (e.g., Mother, Spouse, Son).",
+          regional: "नामांकित व्यक्ति के साथ अपना संबंध लिखें (जैसे माता, पति/पत्नी, पुत्र)।",
+          reason: "नामित लाभार्थी की वैधता को सत्यापित करने के लिए पारिवारिक संबंध स्थापित करता है।"
+        },
+        ta: {
+          tip: "State the nominee's relationship with you (e.g., Mother, Spouse, Son).",
+          regional: "உங்களுடன் பரிந்துரையாளருக்கு உள்ள உறவை குறிப்பிடவும் (எ.கா., தாய், மனைவி, மகன்).",
+          reason: "பரிந்துரைக்கப்பட்ட பயனாளியின் சட்டபூர்வமான தன்மையை சரிபார்க்க குடும்ப உறவை உறுதிப்படுத்துகிறது."
+        },
+        bn: {
+          tip: "State the nominee's relationship with you (e.g., Mother, Spouse, Son).",
+          regional: "আপনার সাথে নমিনির সম্পর্ক উল্লেখ করুন (যেমন মা, স্বামী/স্ত্রী, পুত্র)।",
+          reason: "মনোনীত নমিনির বৈধতা যাচাই করার জন্য পারিবারিক সম্পর্ক স্থাপন করে।"
+        },
+        mr: {
+          tip: "State the nominee's relationship with you (e.g., Mother, Spouse, Son).",
+          regional: "वारसदाराचे तुमच्याशी असलेले नाते लिहा (उदा. आई, पती/पत्नी, मुलगा).",
+          reason: "नियुक्त वारसदाराची वैधता तपासण्यासाठी कौठुंबिक नातेसंबंध स्पष्ट करते."
+        },
+        te: {
+          tip: "State the nominee's relationship with you (e.g., Mother, Spouse, Son).",
+          regional: "నామినీతో మీకున్న సంబంధాన్ని పేర్కొనండి (ఉదా. తల్లి, భార్య/భర్త, కుమారుడు).",
+          reason: "నామినీ యొక్క చట్టబద్ధతను ధృవీకరించడానికి కుటుంబసంబంధాన్ని ఇది తెలియజేస్తుంది."
+        }
+      },
+      nomineeAge: {
+        en: {
+          tip: "Enter the nominee's age in completed years.",
+          regional: "Provide the age of the nominee. If they are under 18, their date of birth is also required.",
+          reason: "Ensures the nominee is legally competent to receive funds directly or if a guardian must be appointed."
+        },
+        hinglish: {
+          tip: "Enter the nominee's age in completed years.",
+          regional: "Nominee ki age (umar) likhein. Agar 18 se kam hai toh date of birth bhi likhni hogi.",
+          reason: "Isse pata chalta hai ki nominee mature hai ya minor, aur kya appointee/guardian ki zarurat hai."
+        },
+        hi: {
+          tip: "Enter the nominee's age in completed years.",
+          regional: "नामांकित व्यक्ति की आयु (वर्षों में) लिखें। यदि वे 18 वर्ष से कम हैं, तो जन्म तिथि भी आवश्यक है।",
+          reason: "यह सुनिश्चित करता है कि नामांकित व्यक्ति सीधे धन प्राप्त करने के लिए कानूनी रूप से सक्षम है या अभिभावक नियुक्त किया जाना चाहिए।"
+        },
+        ta: {
+          tip: "Enter the nominee's age in completed years.",
+          regional: "பரிந்துரையாளரின் தற்போதைய வயதை உள்ளிடவும். 18 வயதுக்கு உட்பட்டவர் எனில், அவரின் பிறந்த தேதியும் தேவைப்படும்.",
+          reason: "பரிந்துரையாளர் நேரடியாக பணத்தைப் பெற தகுதியுடையவரா அல்லது பாதுகாவலர் தேவையா என்பதை உறுதி செய்கிறது."
+        },
+        bn: {
+          tip: "Enter the nominee's age in completed years.",
+          regional: "নমিনির বয়স লিখুন। নমিনির বয়স ১৮ বছরের কম হলে তার জন্ম তারিখও দেওয়া আবশ্যক।",
+          reason: "নমিনি সরাসরি টাকা পাওয়ার জন্য আইনত যোগ্য নাকি কোনো অভিভাবক নিয়োগ করতে হবে তা নিশ্চিত করে।"
+        },
+        mr: {
+          tip: "Enter the nominee's age in completed years.",
+          regional: "वारसदाराचे पूर्ण वय लिहा. वय १८ वर्षांपेक्षा कमी असल्यास जन्मतारीख आवश्यक आहे.",
+          reason: "वारसदार थेट पैसे मिळवण्यासाठी सज्ञान आहे की पालकाची गरज आहे हे ठरवण्यासाठी आवश्यक."
+        },
+        te: {
+          tip: "Enter the nominee's age in completed years.",
+          regional: "నామినీ యొక్క వయస్సును నమోదు చేయండి. నామినీ వయస్సు 18 సంవత్సరాల కంటే తక్కువైతే పుట్టిన తేదీ కూడా అవసరం.",
+          reason: "నామినీ నేరుగా నిధులను స్వీకరించడానికి చట్టబద్ధంగా అర్హుడా లేదా గార్డియన్‌ను నియమించాలా అని నిర్ధారిస్తుంది."
+        }
+      },
+      nomineeDob: {
+        en: {
+          tip: "Provide the nominee's Date of Birth if they are a minor.",
+          regional: "If the nominee is under 18, enter their date of birth in YYYY-MM-DD format.",
+          reason: "Determines the minor status of the nominee and the date they will reach legal adulthood."
+        },
+        hinglish: {
+          tip: "Provide the nominee's Date of Birth if they are a minor.",
+          regional: "Agar nominee minor (18 se kam) hai, toh unki janam tithi YYYY-MM-DD format mein likhein.",
+          reason: "Isse nominee ke minor hone aur unke 18 saal ke hone ki exact date pata chalti hai."
+        },
+        hi: {
+          tip: "Provide the nominee's Date of Birth if they are a minor.",
+          regional: "यदि नामांकित व्यक्ति नाबालिग है, तो उनकी जन्म तिथि YYYY-MM-DD प्रारूप में दर्ज करें।",
+          reason: "नामांकित व्यक्ति के नाबालिग होने की स्थिति और कानूनी रूप से वयस्क होने की तारीख निर्धारित करता है।"
+        },
+        ta: {
+          tip: "Provide the nominee's Date of Birth if they are a minor.",
+          regional: "பரிந்துரையாளர் மைனர் எனில், அவரின் பிறந்த தேதியை YYYY-MM-DD வடிவில் உள்ளிடவும்.",
+          reason: "பரிந்துரையாளர் மைனர் என்பதை உறுதிப்படுத்தவும், அவர் எப்போது மேஜர் ஆவார் என்ற தேதியை அறியவும் உதவுகிறது."
+        },
+        bn: {
+          tip: "Provide the nominee's Date of Birth if they are a minor.",
+          regional: "নমিনি নাবালক হলে তার জন্ম তারিখ YYYY-MM-DD ফরম্যাটে লিখুন।",
+          reason: "নমিনি নাবালক কিনা এবং কোন তারিখে সে সাবালক হবে তা নির্ধারণ করে।"
+        },
+        mr: {
+          tip: "Provide the nominee's Date of Birth if they are a minor.",
+          regional: "वारसदार अल्पवयीन असल्यास त्याची जन्मतारीख YYYY-MM-DD स्वरूपात लिहा.",
+          reason: "वारसदार अल्पवयीन आहे का आणि तो कोणत्या तारखेला सज्ञान होईल हे ठरवते."
+        },
+        te: {
+          tip: "Provide the nominee's Date of Birth if they are a minor.",
+          regional: "నామినీ మైనర్ అయితే వారి పుట్టిన తేదీని YYYY-MM-DD ఆకారంలో నమోదు చేయండి.",
+          reason: "నామినీ మైనర్ అవునా కాదా మరియు అతను ఎప్పుడు వయోజనుడు అవుతాడో ఆ తేదీని నిర్ణయిస్తుంది."
+        }
+      },
+      guardianName: {
+        en: {
+          tip: "Enter the appointee's name if the nominee is a minor.",
+          regional: "Provide the name of the adult guardian who will receive the amount on behalf of the minor nominee.",
+          reason: "Specifies the adult responsible for holding the deposit on behalf of a minor nominee."
+        },
+        hinglish: {
+          tip: "Enter the appointee's name if the nominee is a minor.",
+          regional: "Minor nominee ke case mein, unke guardian ya appointee ka poora naam likhein.",
+          reason: "Minor nominee ke case mein, unke behalf par paise sambhalne wale adult appointee ka naam."
+        },
+        hi: {
+          tip: "Enter the appointee's name if the nominee is a minor.",
+          regional: "नाबालिग नामांकित व्यक्ति के लिए नियुक्त अभिभावक (अप्पॉइंटी) का पूरा नाम लिखें।",
+          reason: "नाबालिग नामांकित व्यक्ति की ओर से जमा राशि प्राप्त करने के लिए जिम्मेदार वयस्क का नाम निर्दिष्ट करता है।"
+        },
+        ta: {
+          tip: "Enter the appointee's name if the nominee is a minor.",
+          regional: "பரிந்துரையாளர் மைனராக இருந்தால், பாதுகாவலரின் பெயரை உள்ளிடவும்.",
+          reason: "மைனர் பரிந்துரையாளரின் சார்பாக பணத்தைப் பெற்றுக்கொள்ளும் பொறுப்புள்ள பெரியவரை நியமிக்கிறது."
+        },
+        bn: {
+          tip: "Enter the appointee's name if the nominee is a minor.",
+          regional: "নমিনি নাবালক হলে তার অভিভাবকের সম্পূর্ণ নাম লিখুন।",
+          reason: "নাবালক নমিনির পক্ষে টাকা গ্রহণ করার জন্য দায়ী প্রাপ্তবয়স্ক ব্যক্তির নাম উল্লেখ করে।"
+        },
+        mr: {
+          tip: "Enter the appointee's name if the nominee is a minor.",
+          regional: "वारसदार अल्पवयीन असल्यास पालकाचे (अप्पॉइंटी) पूर्ण नाव लिहा.",
+          reason: "अल्पवयीन वारसदाराच्या वतीने ठेव रक्कम सांभाळणाऱ्या सज्ञान व्यक्तीचे नाव नोंदवणे आवश्यक असते."
+        },
+        te: {
+          tip: "Enter the appointee's name if the nominee is a minor.",
+          regional: "నామినీ మైనర్ అయినట్లయితే గార్డియన్ పేరును ఇక్కడ నమోదు చేయండి.",
+          reason: "మైనర్ నామినీ తరపున డిపాజిట్‌ను స్వీకరించడానికి బాధ్యత వహించే వయోజనుడి పేరును సూచిస్తుంది."
+        }
+      },
+      guardianAddress: {
+        en: {
+          tip: "Enter the appointee's complete address and age.",
+          regional: "Write the residential address and age of the appointed guardian.",
+          reason: "Required to verify the physical location and adult status of the guardian for legal protection."
+        },
+        hinglish: {
+          tip: "Enter the appointee's complete address and age.",
+          regional: "Guardian ka poora address aur unki age likhein.",
+          reason: "Legal protection ke liye guardian ka address aur age verify karna zaruri hai."
+        },
+        hi: {
+          tip: "Enter the appointee's complete address and age.",
+          regional: "नियुक्त अभिभावक का पूरा पता और उनकी आयु दर्ज करें।",
+          reason: "कानूनी सुरक्षा के लिए अभिभावक के भौतिक स्थान और वयस्क स्थिति को सत्यापित करने के लिए आवश्यक है।"
+        },
+        ta: {
+          tip: "Enter the appointee's complete address and age.",
+          regional: "பாதுகாவலரின் முழு முகவரி மற்றும் அவரின் தற்போதைய வயதை உள்ளிடவும்.",
+          reason: "சட்டப்பூர்வ பாதுகாப்பிற்காக பாதுகாவலரின் முகவரி மற்றும் வயது ஆகியவற்றை சரிபார்க்க தேவைப்படுகிறது."
+        },
+        bn: {
+          tip: "Enter the appointee's complete address and age.",
+          regional: "অভিভাবকের সম্পূর্ণ বাড়ির ঠিকানা এবং তার বয়স উল্লেখ করুন।",
+          reason: "আইনি সুরক্ষার জন্য অভিভাবকের বাড়ির ঠিকানা এবং বয়স যাচাই করা প্রয়োজনীয়।"
+        },
+        mr: {
+          tip: "Enter the appointee's complete address and age.",
+          regional: "नियुक्त पालकांचा पूर्ण पत्ता आणि त्यांचे वय लिहा.",
+          reason: "कायदेशीर संरक्षणासाठी पालकाचा राहण्याचा पत्ता आणि वय पडताळण्यासाठी आवश्यक."
+        },
+        te: {
+          tip: "Enter the appointee's complete address and age.",
+          regional: "గార్డియన్ యొక్క పూర్తి చిరునామా మరియు వయస్సును ఇక్కడ రాయండి.",
+          reason: "చట్టపరమైన రక్షణ కోసం గార్డియన్ యొక్క చిరునామా మరియు వయస్సును ధృవీకరించడానికి ఇది అవసరం."
+        }
+      },
+      printNomineeName: {
+        en: {
+          tip: "Select 'Yes' or 'No' to indicate if you want the nominee's name printed on your passbook.",
+          regional: "Choose whether the nominee's name should be visible on your account passbook statements.",
+          reason: "Gives you control over privacy and provides immediate physical proof of nomination on your passbook."
+        },
+        hinglish: {
+          tip: "Select 'Yes' or 'No' to indicate if you want the nominee's name printed on your passbook.",
+          regional: "Select karein ki kya aap nominee ka naam passbook par print karwana chahte hain — Yes ya No.",
+          reason: "Isse aapki privacy bani rehti hai aur passbook par nominee ka physical proof milta hai."
+        },
+        hi: {
+          tip: "Select 'Yes' or 'No' to indicate if you want the nominee's name printed on your passbook.",
+          regional: "चुनें कि क्या आप पासबुक पर नॉमिनी का नाम प्रिंट कराना चाहते हैं — हाँ (Yes) या नहीं (No)।",
+          reason: "यह आपकी गोपनीयता पर नियंत्रण देता है और आपकी पासबुक पर नामांकन का तत्काल भौतिक प्रमाण प्रदान करता है।"
+        },
+        ta: {
+          tip: "Select 'Yes' or 'No' to indicate if you want the nominee's name printed on your passbook.",
+          regional: "பரிந்துரையாளரின் பெயர் பாஸ்புக்கில் அச்சிடப்பட வேண்டுமா என்பதை ஆம் அல்லது இல்லை என தேர்வு செய்யவும்.",
+          reason: "இது உங்களின் தனிப்பட்ட விவர பாதுகாப்பை உறுதி செய்வதோடு, பாஸ்புக்கில் பரிந்துரைக்கான சான்றை வழங்குகிறது."
+        },
+        bn: {
+          tip: "Select 'Yes' or 'No' to indicate if you want the nominee's name printed on your passbook.",
+          regional: "পাসবুকে নমিনির নাম প্রিন্ট করাতে চান কিনা তা 'হ্যাঁ' অথবা 'না' সিলেক্ট করে জানান।",
+          reason: "এটি আপনার গোপনীয়তার নিয়ন্ত্রণ দেয় এবং আপনার পাসবুকে নমিনির নামের একটি তাত্ক্ষণিক প্রমাণ দেয়।"
+        },
+        mr: {
+          tip: "Select 'Yes' or 'No' to indicate if you want the nominee's name printed on your passbook.",
+          regional: "पासबुकवर नॉमिनीचे नाव छापायचे आहे का, ते होय (Yes) किंवा नाही (No) निवडून सांगा.",
+          reason: "हे तुमच्या गोपनीयतेची खात्री देते आणि पासबुकवर वारसदाराचे नाव छापल्याने थेट पुरावा मिळतो."
+        },
+        te: {
+          tip: "Select 'Yes' or 'No' to indicate if you want the nominee's name printed on your passbook.",
+          regional: "మీ పాస్‌బుక్‌పై నామినీ పేరు ముద్రించాలో లేదో అవును లేదా కాదు అని ఎంచుకోండి.",
+          reason: "ఇది మీ గోప్యతపై నియంత్రణను ఇస్తుంది మరియు మీ పాస్‌బుక్‌పై నామినేషన్ యొక్క తక్షణ భౌతిక నిరూపణను అందిస్తుంది."
+        }
+      }
     };
-    const langData = db[fieldId]?.[currentLang] || db[fieldId]?.['en'];
+
+    const langData = db[fieldId]?.[formLang] || db[fieldId]?.['en'];
     const enData = db[fieldId]?.['en'];
     if (langData && enData) {
-      return { tip: enData.tip, regional: langData.regional, reason: enData.reason };
+      return { tip: enData.tip, regional: langData.regional, reason: langData.reason };
     }
-    const fallback = { tip: 'Provide the requested details accurately. Double-check for typing errors.', regional: '', reason: 'Ensures accurate database recording and prevents rejection.' };
-    if (formLang === 'hi') fallback.regional = 'अनुरोधित विवरण सटीक रूप से दर्ज करें।';
-    else if (formLang === 'hinglish') fallback.regional = 'Maangi gayi jaankari sahi se bhare.  Typing mistakes check karein.';
-    else if (formLang === 'ta') fallback.regional = 'கோரப்பட்ட விவரங்களை சரியாக வழங்கவும்.';
-    else if (formLang === 'bn') fallback.regional = 'অনুরোধিত বিবরণ সঠিকভাবে প্রদান করুন।';
-    else if (formLang === 'mr') fallback.regional = 'विनंती केलेले तपशील अचूकपणे भरा.';
-    else if (formLang === 'te') fallback.regional = 'అభ్యర్థించిన వివరాలు ఖచ్చితంగా నమోదు చేయండి.';
-    else fallback.regional = 'Enter the requested details carefully.';
+    const fallback = {
+      tip: "Provide the requested details for this specific box as specified.",
+      regional: "",
+      reason: "Necessary to complete this field accurately for the bank's records."
+    };
+    if (formLang === 'hi') fallback.regional = 'कृपया इस विशिष्ट बॉक्स के लिए मांगे गए विवरण दर्ज करें।';
+    else if (formLang === 'hinglish') fallback.regional = 'Is specific box ke liye maangi gayi details fill karein.';
+    else if (formLang === 'ta') fallback.regional = 'இந்த குறிப்பிட்ட பெட்டிக்கான விவரங்களை வழங்கவும்.';
+    else if (formLang === 'bn') fallback.regional = 'এই নির্দিষ্ট ঘরের জন্য প্রয়োজনীয় তথ্য দিন।';
+    else if (formLang === 'mr') fallback.regional = 'या विशिष्ट चौकटीसाठी विचारलेली माहिती भरा.';
+    else if (formLang === 'te') fallback.regional = 'ఈ నిర్దిష్ట పెట్టెకు సంబంధించిన వివరాలను నమోదు చేయండి.';
+    else fallback.regional = "Enter the requested details for this specific field.";
     return fallback;
   };
 
@@ -1049,7 +1932,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                                         <span className="text-[9px] font-bold text-on-surface-variant uppercase">{t('sh_guide_why_label', formLang)}</span>
                                         <button
                                           type="button"
-                                          onClick={() => speakText(info.reason, `why-${currentField.id}`, 'en-IN')}
+                                          onClick={() => speakText(info.reason, `why-${currentField.id}`)}
                                           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer shadow-sm ${activeSpeechId === `why-${currentField.id}` && isSpeaking ? 'bg-on-surface-variant text-white border-on-surface-variant animate-pulse' : 'bg-white text-on-surface-variant border-outline-variant/50 hover:bg-surface-container'}`}
                                         >
                                           {activeSpeechId === `why-${currentField.id}` && isSpeaking
