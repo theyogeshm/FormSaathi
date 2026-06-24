@@ -407,17 +407,6 @@ export default function Showcase({ initialActiveTab = 'photo' }: ShowcaseProps) 
         index++;
       } else {
         clearInterval(interval);
-
-        // Check for nominee reminder flow if activeTab is photo
-        if (activeTab === 'photo') {
-          if (!currentUser.nominee_name) {
-            // Trigger the existing nominee reminder flow
-            setTimeout(() => {
-              setActiveTab('voice');
-              handleStartVoiceSim(currentUser);
-            }, 1500);
-          }
-        }
       }
     }, 350);
   };
