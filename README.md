@@ -1,14 +1,9 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
-
 # FormSaathi
 
 This repository contains the code for FormSaathi, which simplifies banking by filling complex forms in 30 seconds using advanced Vision AI and local voice interfaces.
 
 All frontend application files are now contained in the `frontend/` directory.
 
-View your app in AI Studio: https://ai.studio/apps/c9bee0de-fff3-483f-abd0-fe8b3863d740
 
 ## Project Structure
 
