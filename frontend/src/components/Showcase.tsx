@@ -1811,7 +1811,7 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
                   <div className="space-y-6">
                     {/* Simulated File Drop area */}
                     {!isScanning && !selectedDoc && !uploadedImageSrc && (
-                      <div className="border-2 border-dashed border-outline-variant/60 rounded-2xl p-6 sm:p-8 flex flex-col items-center text-center hover:border-primary transition-colors group">
+                      <div className="relative border-2 border-dashed border-outline-variant/60 rounded-2xl p-6 sm:p-8 flex flex-col items-center text-center hover:border-primary transition-colors group">
                         {/* Hidden inputs - desktop combined, mobile split */}
                         {!isMobile && (
                           <input
