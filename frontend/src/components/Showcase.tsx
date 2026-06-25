@@ -1746,9 +1746,6 @@ export default function Showcase({ initialActiveTab = 'photo', currentLang = 'en
           <p className="text-body-md text-on-surface-variant max-w-xl mx-auto">
             {t('sh_desc', formLang)}
           </p>
-          <div className="bg-primary/5 border border-primary/20 py-2.5 px-4 rounded-xl max-w-xl mx-auto text-xs font-semibold text-primary leading-relaxed shadow-sm">
-            {t('sh_demo_note', formLang)}
-          </div>
         </div>
 
         {/* Tab Controls */}

@@ -22,18 +22,18 @@ export default function FeaturesGrid({ currentLang }: FeaturesGridProps) {
         </div>
 
         {/* Features Card Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {FEATURES.map((feat) => {
             const translatedTitle = t(`feat_${feat.id}_title`, currentLang);
             const translatedDesc = t(`feat_${feat.id}_desc`, currentLang);
             return (
               <div 
                 key={feat.id}
-                className="relative p-10 bg-surface-container-low rounded-[32px] border border-outline-variant/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
+                className="relative p-7 pt-10 bg-surface-container-low rounded-[28px] border border-outline-variant/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
                 id={`feature-card-${feat.id}`}
               >
               {/* Hotlinked 3D Icon Badge */}
-              <div className="absolute -top-6 -left-6 w-20 h-20 transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 drop-shadow-md">
+              <div className="absolute -top-5 -left-5 w-16 h-16 transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 drop-shadow-md">
                 <img 
                   alt={feat.title} 
                   className="w-full h-full object-contain filter drop-shadow-md" 
@@ -43,11 +43,11 @@ export default function FeaturesGrid({ currentLang }: FeaturesGridProps) {
               </div>
 
               {/* Card Text Content */}
-              <div className="pt-8">
-                <h3 className="font-headline-md text-2xl font-bold text-on-surface mb-4">
+              <div className="pt-5">
+                <h3 className="font-headline-md text-lg font-bold text-on-surface mb-2">
                   {translatedTitle}
                 </h3>
-                <p className="text-body-md text-on-surface-variant leading-relaxed text-lg">
+                <p className="text-body-md text-on-surface-variant leading-relaxed text-sm">
                   {translatedDesc}
                 </p>
               </div>
